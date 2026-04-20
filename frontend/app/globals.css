@@ -1,0 +1,369 @@
+:root {
+  color-scheme: light;
+  --bg: #f3f7ff;
+  --surface: #ffffff;
+  --surface-soft: #f8fbff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --line: #dbe4f2;
+  --brand: #2563eb;
+  --brand-strong: #1d4ed8;
+  --danger: #dc2626;
+  --radius: 14px;
+  --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top, #eaf1ff 0, var(--bg) 35%);
+  color: var(--text);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.layout {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 20px 36px;
+}
+
+.hero {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 45%, #4f46e5 100%);
+  color: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.hero h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.hero p {
+  margin: 0;
+  opacity: 0.92;
+  line-height: 1.5;
+}
+
+.nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0 0;
+}
+
+.navLink {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  font-size: 14px;
+  color: #e0e7ff;
+  transition: 0.2s ease;
+}
+
+.navLink:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.navLink.active {
+  background: #fff;
+  color: #1d4ed8;
+  border-color: #fff;
+}
+
+.page {
+  margin-top: 18px;
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.pageHeader h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.pageHeader p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.card {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.field {
+  margin-top: 12px;
+}
+
+.field label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  font-size: 14px;
+}
+
+textarea {
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid #bfdbfe;
+  border-color: #93c5fd;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+button {
+  border: none;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+}
+
+.btnPrimary {
+  background: var(--brand);
+  color: #fff;
+}
+
+.btnPrimary:hover {
+  background: var(--brand-strong);
+}
+
+.btnSecondary {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.btnSecondary:hover {
+  background: #d6deea;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.dropzone {
+  width: 100%;
+  margin: 0;
+  padding: 20px 14px;
+  border: 1px dashed #93c5fd;
+  border-radius: 12px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.dropzone:hover {
+  background: #dbeafe;
+}
+
+.dropzone.dragOver {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.healthCard {
+  background: #f8fbff;
+}
+
+.healthHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.healthHead h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.healthRow {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.healthItem {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+  background: #fff;
+}
+
+.healthItem.ok {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.healthItem.bad {
+  border-color: #fecaca;
+  background: #fff1f2;
+}
+
+.healthLabel {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.healthValue {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.healthModel {
+  font-size: 12px;
+  color: #475569;
+}
+
+.healthDetails {
+  margin-top: 10px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fff;
+}
+
+.healthDetails summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #334155;
+}
+
+.healthDetails p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.error {
+  margin-top: 10px;
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.result {
+  margin-top: 14px;
+}
+
+.result h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+}
+
+.listItem {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.listItemHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.listItem p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.badge {
+  font-size: 12px;
+  color: #1e40af;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.tagRow {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 12px;
+  color: #334155;
+  background: #e2e8f0;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+pre {
+  margin: 0;
+  background: #0b1020;
+  color: #d1e4ff;
+  padding: 12px;
+  border-radius: 10px;
+  overflow-x: auto;
+  min-height: 84px;
+}

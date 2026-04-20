@@ -1,0 +1,35 @@
+# Python cache and artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test and coverage outputs
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+template/
+
+# Frontend dependencies and build artifacts
+frontend/node_modules/
+frontend/.next/
+
+# Local runtime data
+storage/*.db
