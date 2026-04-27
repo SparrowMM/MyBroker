@@ -30,6 +30,9 @@ template/
 # Frontend dependencies and build artifacts
 frontend/node_modules/
 frontend/.next/
+frontend/out/
+frontend/.turbo/
+frontend/.vercel/
 
 # Local runtime data
 storage/*.db
