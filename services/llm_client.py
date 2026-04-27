@@ -304,14 +304,58 @@ class BailianClient:
                 ],
             },
         ]
-        return self._chat(
+        # 先走用户配置的视觉端点；若端点不接受 data URI（常见于原生 multimodal-generation），
+        # 自动回退到 compatible-mode，避免本地上传图片解析失败。
+        content, err = self._chat_with_status(
             messages,
             temperature=0.1,
             scenario="image_to_markdown",
             model=self.settings.bailian_vision_model,
             base_url_override=self.settings.bailian_vision_base_url,
             api_key_override=self.settings.bailian_vision_api_key,
+            timeout_sec=120.0,
         )
+        if content:
+            return content
+        if "image format is illegal" in (err or "").lower():
+            fallback_content, _ = self._chat_with_status(
+                messages,
+                temperature=0.1,
+                scenario="image_to_markdown_fallback_compatible",
+                model=self.settings.bailian_vision_model,
+                base_url_override="https://dashscope.aliyuncs.com/compatible-mode/v1",
+                api_key_override=self.settings.bailian_vision_api_key,
+                timeout_sec=120.0,
+            )
+            return fallback_content
+        return ""
+
+    def normalize_daily_text(self, raw_input: str, record_date: str, extra_prompt: str = "") -> str:
+        if not raw_input.strip():
+            return ""
+        prompt = (
+            f"请将以下日报内容整理为统一的 Markdown 标准格式（日期：{record_date}）。\n"
+            "格式要求：\n"
+            "1) 仅输出 Markdown，不要输出额外解释；\n"
+            "2) 结构固定为：# 标题、## 今日进展、## 风险与阻塞、## 明日计划、## 待确认事项；\n"
+            "3) 每个小节使用项目符号；若无信息请写“待补充”；\n"
+            "4) 禁止编造事实，信息不足时保持保守表达。\n"
+        )
+        if extra_prompt.strip():
+            prompt += f"补充要求：{extra_prompt.strip()}\n"
+        prompt += f"原始内容：\n{raw_input.strip()}"
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": "你是专业经纪人助理，擅长将杂乱日报整理成标准结构化内容。"},
+            {"role": "user", "content": prompt},
+        ]
+        content, _err = self._chat_with_status(
+            messages,
+            temperature=0.1,
+            scenario="normalize_daily_text",
+            timeout_sec=120.0,
+            max_tokens=8192,
+        )
+        return (content or "").strip()
 
     def probe_text_model(self) -> tuple[bool, str]:
         if not self.settings.bailian_api_key:

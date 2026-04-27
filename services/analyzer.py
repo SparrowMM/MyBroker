@@ -91,9 +91,32 @@ class RecordAnalyzer:
         return summary, highlights, risks, suggestions
 
 
-def decode_json_list(raw: str) -> list[str]:
-    try:
-        value = json.loads(raw)
-        return value if isinstance(value, list) else []
-    except json.JSONDecodeError:
+def decode_json_list(raw: str | None) -> list[str]:
+    def _coerce_list_items(value: list) -> list[str]:
+        out: list[str] = []
+        for item in value:
+            if item is None:
+                continue
+            if isinstance(item, str):
+                out.append(item)
+            elif isinstance(item, (dict, list)):
+                out.append(json.dumps(item, ensure_ascii=False))
+            else:
+                out.append(str(item))
+        return out
+
+    if raw is None:
         return []
+    if isinstance(raw, str):
+        if not raw.strip():
+            return []
+        try:
+            value = json.loads(raw)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return []
+        if isinstance(value, list):
+            return _coerce_list_items(value)
+        return []
+    if isinstance(raw, list):
+        return _coerce_list_items(raw)
+    return []

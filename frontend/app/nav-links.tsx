@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/records", label: "日报录入" },
+  { href: "/health", label: "模型健康检查" },
   { href: "/records/history", label: "日报列表" },
   { href: "/analysis", label: "日报分析" },
   { href: "/reports", label: "周月报表" },

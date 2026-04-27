@@ -335,6 +335,19 @@ button:disabled {
   line-height: 1.5;
 }
 
+.recordBlock {
+  border: 1px solid var(--line);
+  background: #f8fbff;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.recordBlock p {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .badge {
   font-size: 12px;
   color: #1e40af;
@@ -366,4 +379,593 @@ pre {
   border-radius: 10px;
   overflow-x: auto;
   min-height: 84px;
+}
+
+/* —— 日报录入 · 分步流程 —— */
+.recordFlow {
+  padding: 0;
+  overflow: hidden;
+}
+
+.flowStepper {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin: 0;
+  padding: 14px 12px;
+  background: linear-gradient(180deg, #fff 0%, #f1f5ff 100%);
+  border-bottom: 1px solid var(--line);
+  list-style: none;
+}
+
+.flowStepperItem {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.flowStepBtn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 6px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.15s ease;
+}
+
+.flowStepBtn:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.flowStepBtn--upcoming {
+  opacity: 0.55;
+}
+
+.flowStepBtn--current .flowStepTitle {
+  color: var(--brand-strong);
+}
+
+.flowStepCircle {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.flowStepBtn--current .flowStepCircle {
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+}
+
+.flowStepBtn--done .flowStepCircle {
+  background: #22c55e;
+  color: #fff;
+}
+
+.flowStepMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.flowStepTitle {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.flowStepHint {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.flowStepRail {
+  width: 1px;
+  align-self: stretch;
+  min-height: 36px;
+  margin: 0 4px;
+  background: linear-gradient(180deg, transparent, #cbd5e1 12%, #cbd5e1 88%, transparent);
+}
+
+.flowPanel {
+  padding: 18px 16px 20px;
+  animation: flowPanelIn 0.24s ease-out;
+}
+
+@keyframes flowPanelIn {
+  from {
+    opacity: 0.65;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.flowPanelTitle {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.flowPanelLead {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.fieldLabelLike {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.flowFieldTight {
+  margin-top: 8px;
+}
+
+.segmented {
+  display: flex;
+  padding: 4px;
+  border-radius: 12px;
+  background: #e2e8f0;
+  gap: 4px;
+}
+
+.segmentedItem {
+  flex: 1;
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.segmentedItem.isActive {
+  background: #fff;
+  color: var(--brand-strong);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+.flowDropzone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  text-align: center;
+}
+
+.flowDropzoneMain {
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.flowDropzoneSub {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.flowInlineActions {
+  margin-top: 10px;
+  justify-content: flex-start;
+}
+
+.flowCharHint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.flowContextBox {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  margin-bottom: 14px;
+}
+
+.flowContextHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.flowContextLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.flowContextEditLink {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.flowContextEditLink:hover {
+  color: var(--brand-strong);
+}
+
+.flowContextPre {
+  margin: 0;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #334155;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.flowStackActions {
+  margin-top: 8px;
+  justify-content: flex-start;
+}
+
+.flowGenerateRow {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.flowGenerateHint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+  max-width: 520px;
+}
+
+.flowBanner {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.flowBanner strong {
+  font-size: 13px;
+}
+
+.flowBanner--ok {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+.flowBanner--warn {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+
+.flowPreviewTextarea {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 280px;
+}
+
+.flowFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.flowFooter--single {
+  justify-content: flex-end;
+}
+
+.flowFooterRight {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.flowSuccess {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.flowSuccessIcon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #22c55e;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.flowSuccessHint {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #047857;
+  line-height: 1.45;
+}
+
+.flowError {
+  margin: 0 16px 16px;
+}
+
+.flowPreviewPlaceholder {
+  margin-top: 16px;
+  padding: 20px 16px;
+  border: 1px dashed #93c5fd;
+  border-radius: 12px;
+  background: #f8fafc;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.flowPreviewPlaceholder strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #475569;
+}
+
+/* Markdown 双栏：源码 + 预览 */
+.mdSplit {
+  margin-top: 16px;
+}
+
+.mdSplitLabel {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.mdSplitGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.mdSplitCol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.mdSplitCol--preview {
+  background: #fafbff;
+}
+
+.mdSplitColTitle {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--line);
+  background: #f1f5f9;
+}
+
+.mdSplitSource {
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 0;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 300px;
+  background: #fff;
+  color: var(--text);
+}
+
+.mdSplitSource:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px #bfdbfe;
+}
+
+.mdPreview {
+  padding: 14px 16px 18px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1e293b;
+  max-height: min(70vh, 560px);
+  overflow: auto;
+}
+
+.mdPreview :first-child {
+  margin-top: 0;
+}
+
+.mdPreview :last-child {
+  margin-bottom: 0;
+}
+
+.mdPreview h1 {
+  font-size: 1.35rem;
+  margin: 1.1em 0 0.5em;
+  font-weight: 700;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.35em;
+}
+
+.mdPreview h2 {
+  font-size: 1.15rem;
+  margin: 1em 0 0.45em;
+  font-weight: 700;
+}
+
+.mdPreview h3 {
+  font-size: 1.05rem;
+  margin: 0.9em 0 0.4em;
+  font-weight: 600;
+}
+
+.mdPreview p {
+  margin: 0.55em 0;
+}
+
+.mdPreview ul,
+.mdPreview ol {
+  margin: 0.5em 0;
+  padding-left: 1.35em;
+}
+
+.mdPreview li {
+  margin: 0.25em 0;
+}
+
+.mdPreview a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mdPreview code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: #e2e8f0;
+  padding: 0.12em 0.4em;
+  border-radius: 6px;
+}
+
+.mdPreview pre {
+  margin: 0.75em 0;
+  padding: 12px 14px;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.mdPreview pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.mdPreview blockquote {
+  margin: 0.75em 0;
+  padding: 0.35em 0 0.35em 1em;
+  border-left: 4px solid #93c5fd;
+  color: #475569;
+  background: #f8fafc;
+  border-radius: 0 8px 8px 0;
+}
+
+.mdPreview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin: 0.75em 0;
+}
+
+.mdPreview th,
+.mdPreview td {
+  border: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.mdPreview th {
+  background: #f1f5f9;
+}
+
+@media (max-width: 720px) {
+  .flowStepper {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .flowStepperItem {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .flowStepRail {
+    width: auto;
+    height: 1px;
+    min-height: 0;
+    margin: 6px 0 6px 34px;
+    background: linear-gradient(90deg, transparent, #cbd5e1 10%, #cbd5e1 90%, transparent);
+  }
+
+  .flowFooterRight {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .mdSplitGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .mdPreview {
+    max-height: 420px;
+  }
 }

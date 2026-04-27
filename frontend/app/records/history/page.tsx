@@ -5,15 +5,19 @@ import { getJson } from "../../../lib/api";
 
 type HistoryRecord = {
   id: number;
-  date: string;
-  summary: string;
+  record_date: string;
+  raw_text: string;
+  chat_text: string;
+  screenshot_notes: string;
+  analysis_summary: string;
   tags: string[];
+  screenshot_paths: string[];
 };
 
 type DashboardResponse = {
   days: number;
   total_records: number;
-  latest_records: HistoryRecord[];
+  records: HistoryRecord[];
 };
 
 const DAY_OPTIONS = [7, 14, 30, 60, 90];
@@ -25,14 +29,27 @@ export default function RecordsHistoryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const hasRecords = useMemo(() => records.length > 0, [records]);
+  const groupedRecords = useMemo(() => {
+    const groups: Record<string, HistoryRecord[]> = {};
+    for (const item of records) {
+      const key = item.record_date;
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(item);
+    }
+    return groups;
+  }, [records]);
+
+  const groupedDates = useMemo(() => Object.keys(groupedRecords), [groupedRecords]);
+  const hasRecords = useMemo(() => groupedDates.length > 0, [groupedDates]);
 
   const loadHistory = async (targetDays: number) => {
     setError("");
     setIsLoading(true);
     try {
-      const data = await getJson<DashboardResponse>(`/api/v2/dashboard?days=${targetDays}`);
-      setRecords(data.latest_records ?? []);
+      const data = await getJson<DashboardResponse>(`/api/v2/records?days=${targetDays}`);
+      setRecords(data.records ?? []);
       setTotalRecords(data.total_records ?? 0);
     } catch (err) {
       setError(String(err));
@@ -49,7 +66,7 @@ export default function RecordsHistoryPage() {
     <>
       <header className="pageHeader">
         <h2>历史日报列表</h2>
-        <p>按最近天数查看历史日报摘要，快速回顾工作进展与关键标签。</p>
+        <p>按每日存储格式展示历史日报，包含原始内容、AI 标准内容与分析信息。</p>
       </header>
 
       <section className="card">
@@ -85,23 +102,47 @@ export default function RecordsHistoryPage() {
           <pre>{isLoading ? "正在加载历史日报..." : "暂无历史日报数据"}</pre>
         ) : (
           <div className="list">
-            {records.map((item) => (
-              <article key={item.id} className="listItem">
+            {groupedDates.map((recordDate) => (
+              <article key={recordDate} className="listItem">
                 <div className="listItemHead">
-                  <strong>{item.date}</strong>
-                  <span className="badge">#{item.id}</span>
+                  <strong>{recordDate}</strong>
+                  <span className="badge">{groupedRecords[recordDate].length} 条</span>
                 </div>
-                <p>{item.summary || "暂无摘要"}</p>
-                <div className="tagRow">
-                  {(item.tags || []).length > 0 ? (
-                    item.tags.map((tag) => (
-                      <span key={`${item.id}-${tag}`} className="tag">
-                        {tag}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="hint">无标签</span>
-                  )}
+                <div className="list">
+                  {groupedRecords[recordDate].map((item) => (
+                    <div key={item.id} className="recordBlock">
+                      <div className="listItemHead">
+                        <strong>记录 #{item.id}</strong>
+                      </div>
+                      <p>
+                        <strong>分析摘要：</strong>
+                        {item.analysis_summary || "暂无摘要"}
+                      </p>
+                      <p>
+                        <strong>原始内容：</strong>
+                        {item.raw_text || "待补充"}
+                      </p>
+                      <p>
+                        <strong>AI 标准内容：</strong>
+                        {item.chat_text || "待补充"}
+                      </p>
+                      <p>
+                        <strong>补充备注：</strong>
+                        {item.screenshot_notes || "无"}
+                      </p>
+                      <div className="tagRow">
+                        {(item.tags || []).length > 0 ? (
+                          item.tags.map((tag) => (
+                            <span key={`${item.id}-${tag}`} className="tag">
+                              {tag}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="hint">无标签</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </article>
             ))}
