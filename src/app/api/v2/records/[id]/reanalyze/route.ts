@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dailyRecordToJson } from "@/lib/daily-record-json";
 import { analyzeDaily } from "@/lib/record-analyzer";
+import { jsonErrorResponse } from "@/lib/api-error";
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -13,29 +14,33 @@ export async function POST(_req: Request, context: { params: Promise<{ id: strin
   const { id: idStr } = await context.params;
   const id = parseId(idStr);
   if (id === null) {
-    return NextResponse.json({ message: "无效的 id" }, { status: 400 });
+    return NextResponse.json({ ok: false, message: "无效的 id" }, { status: 400 });
   }
 
-  const existing = await prisma.dailyRecord.findUnique({ where: { id } });
-  if (!existing) {
-    return NextResponse.json({ message: "记录不存在" }, { status: 404 });
+  try {
+    const existing = await prisma.dailyRecord.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ ok: false, message: "记录不存在" }, { status: 404 });
+    }
+
+    const { summary, tags } = await analyzeDaily(
+      existing.recordDate,
+      existing.rawText,
+      existing.chatText,
+      existing.screenshotNotes,
+    );
+
+    const updated = await prisma.dailyRecord.update({
+      where: { id },
+      data: {
+        analysisSummary: summary,
+        tagsJson: JSON.stringify(tags),
+        updatedAt: new Date(),
+      },
+    });
+
+    return NextResponse.json({ ok: true, record: dailyRecordToJson(updated) });
+  } catch (err) {
+    return jsonErrorResponse(err, "重新分析失败");
   }
-
-  const { summary, tags } = await analyzeDaily(
-    existing.recordDate,
-    existing.rawText,
-    existing.chatText,
-    existing.screenshotNotes,
-  );
-
-  const updated = await prisma.dailyRecord.update({
-    where: { id },
-    data: {
-      analysisSummary: summary,
-      tagsJson: JSON.stringify(tags),
-      updatedAt: new Date(),
-    },
-  });
-
-  return NextResponse.json({ ok: true, record: dailyRecordToJson(updated) });
 }

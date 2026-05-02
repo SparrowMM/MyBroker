@@ -1,263 +1,230 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { getJson, postFormData, postJson } from "@/lib/api";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { getJson, postJson } from "@/lib/api";
+import { daysAgoLocalYmd, todayLocalYmd } from "@/lib/local-date";
+import { HealthBanner } from "./_components/health-banner";
+import { RecordCard } from "./_components/record-card";
+import { RecordForm } from "./_components/record-form";
+import { ScreenshotHelper } from "./_components/screenshot-helper";
+import type { DailyRecordDto, RecordPayload } from "./_components/types";
 
-type HealthItem = {
-  ok: boolean;
-  model?: string;
-  error?: string;
-};
+const RECENT_DAYS = 7;
 
-type SystemHealth = {
-  llm_text?: HealthItem;
-  llm_vision?: HealthItem;
+type DayChip = {
+  date: string;
+  label: string;
+  count: number;
 };
 
 export default function RecordsPage() {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [result, setResult] = useState("");
-  const [error, setError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [healthError, setHealthError] = useState("");
-  const [isHealthLoading, setIsHealthLoading] = useState(true);
-  const [rawText, setRawText] = useState("");
-  const [chatText, setChatText] = useState("");
-  const [screenshotNotes, setScreenshotNotes] = useState("");
-  const [saveMsg, setSaveMsg] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const today = todayLocalYmd();
+  const [date, setDate] = useState(today);
+  const [recent, setRecent] = useState<DailyRecordDto[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [listError, setListError] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [savedFlash, setSavedFlash] = useState("");
 
-  useEffect(() => {
-    let active = true;
-    async function loadHealth() {
-      setIsHealthLoading(true);
-      setHealthError("");
-      try {
-        const data = await getJson<SystemHealth>("/api/v2/system/health");
-        if (active) {
-          setHealth(data);
-        }
-      } catch (err) {
-        if (active) {
-          setHealthError(String(err));
-        }
-      } finally {
-        if (active) {
-          setIsHealthLoading(false);
-        }
-      }
+  const [externalRaw, setExternalRaw] = useState<{
+    value: string;
+    mode: "append" | "replace";
+    nonce: number;
+  } | null>(null);
+
+  const loadRecent = useCallback(async () => {
+    setLoading(true);
+    setListError("");
+    try {
+      const start = daysAgoLocalYmd(RECENT_DAYS - 1);
+      const end = todayLocalYmd();
+      const qs = new URLSearchParams({ start_date: start, end_date: end, limit: "200" });
+      const rows = await getJson<DailyRecordDto[]>(`/api/v2/records?${qs.toString()}`);
+      setRecent(rows);
+    } catch (err) {
+      setListError(String(err));
+      setRecent([]);
+    } finally {
+      setLoading(false);
     }
-    loadHealth().catch(() => undefined);
-    return () => {
-      active = false;
-    };
   }, []);
 
-  const saveTextRecord = async () => {
-    setError("");
-    setSaveMsg("");
-    setIsSaving(true);
+  useEffect(() => {
+    loadRecent().catch(() => undefined);
+  }, [loadRecent]);
+
+  const dayChips: DayChip[] = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of recent) {
+      counts.set(r.record_date, (counts.get(r.record_date) ?? 0) + 1);
+    }
+    const arr: DayChip[] = [];
+    for (let i = 0; i < RECENT_DAYS; i++) {
+      const ymd = daysAgoLocalYmd(i);
+      const label =
+        i === 0 ? "今天" : i === 1 ? "昨天" : `${ymd.slice(5)} (${weekdayLabel(ymd)})`;
+      arr.push({ date: ymd, label, count: counts.get(ymd) ?? 0 });
+    }
+    return arr;
+  }, [recent]);
+
+  const recordsForDate = useMemo(
+    () => recent.filter((r) => r.record_date === date),
+    [recent, date],
+  );
+
+  const handleCreate = async (payload: RecordPayload): Promise<boolean> => {
+    setCreateError("");
+    setSavedFlash("");
     try {
-      const data = await postJson<{ ok?: boolean; record?: { id: number } }>("/api/v2/records", {
-        record_date: date,
-        raw_text: rawText,
-        chat_text: chatText,
-        screenshot_notes: screenshotNotes,
-        screenshot_paths: [],
-      });
-      if (data.ok && data.record?.id != null) {
-        setSaveMsg(`已保存并生成分析，记录 ID: ${data.record.id}。可在「日报列表」中查看。`);
+      const data = await postJson<{ ok?: boolean; record?: DailyRecordDto; message?: string }>(
+        "/api/v2/records",
+        payload,
+      );
+      if (data.ok && data.record) {
+        setRecent((prev) => sortRecords([data.record!, ...prev]));
+        setSavedFlash(`已保存 ${data.record.record_date} 日报（#${data.record.id}），AI 摘要已生成。`);
+        setTimeout(() => setSavedFlash(""), 4000);
+        return true;
       }
+      setCreateError(data.message || "保存失败");
+      return false;
     } catch (err) {
-      setError(String(err));
-    } finally {
-      setIsSaving(false);
+      setCreateError(String(err));
+      return false;
     }
   };
 
-  const submit = async () => {
-    setError("");
-    if (!selectedFile) {
-      setError("请先选择本地截图后再提交。");
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", selectedFile);
-      const data = await postFormData<{ markdown?: string; detail?: string }>(
-        `/api/v2/records/markdown-from-image?record_date=${encodeURIComponent(date)}`,
-        fd,
-      );
-      setResult(data.markdown || "");
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setIsSubmitting(false);
-    }
+  const handleCardChange = (record: DailyRecordDto) => {
+    setRecent((prev) => sortRecords(prev.map((r) => (r.id === record.id ? record : r))));
   };
+
+  const handleCardDelete = (id: number) => {
+    setRecent((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const handleMergeMarkdown = (markdown: string) => {
+    setExternalRaw({ value: markdown, mode: "append", nonce: Date.now() });
+    setSavedFlash("已将解析结果合入下方「工作描述」，确认后点击保存。");
+    setTimeout(() => setSavedFlash(""), 4000);
+  };
+
+  const isViewingToday = date === today;
 
   return (
     <>
       <header className="pageHeader">
-        <h2>日报录入</h2>
-        <p>
-          可先填写文字内容由服务端入库并自动生成摘要；也可仅上传本地截图（支持拖拽），由视觉模型解析为 Markdown（默认不上传至云存储）。
-        </p>
+        <h2>日报工作台</h2>
+        <p>聚焦于「今日 / 选中日期」的日报：直接新建、就地编辑、重新分析或删除。完整历史请到 <Link href="/records/history" className="inlineLink">日报列表</Link>。</p>
       </header>
 
-      <section className="card healthCard">
-        <div className="healthHead">
-          <h3>模型健康状态</h3>
+      <section className="card daySwitcher">
+        <div className="daySwitcherHead">
+          <div className="daySwitcherTitle">
+            <strong>查看日期</strong>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              max={today}
+              className="dateInputInline"
+            />
+          </div>
           <button
             type="button"
             className="btnSecondary"
-            onClick={async () => {
-              setIsHealthLoading(true);
-              setHealthError("");
-              try {
-                const data = await getJson<SystemHealth>("/api/v2/system/health");
-                setHealth(data);
-              } catch (err) {
-                setHealthError(String(err));
-              } finally {
-                setIsHealthLoading(false);
-              }
-            }}
-            disabled={isHealthLoading}
+            onClick={() => setDate(today)}
+            disabled={isViewingToday}
           >
-            {isHealthLoading ? "检测中..." : "重新检测"}
+            跳到今天
           </button>
         </div>
-        <div className="healthRow">
-          <div className={`healthItem ${health?.llm_text?.ok ? "ok" : "bad"}`}>
-            <span className="healthLabel">文本模型</span>
-            <span className="healthValue">{health?.llm_text?.ok ? "✅ OK" : "❌ Fail"}</span>
-            {health?.llm_text?.model && <span className="healthModel">{health.llm_text.model}</span>}
-          </div>
-          <div className={`healthItem ${health?.llm_vision?.ok ? "ok" : "bad"}`}>
-            <span className="healthLabel">视觉模型</span>
-            <span className="healthValue">{health?.llm_vision?.ok ? "✅ OK" : "❌ Fail"}</span>
-            {health?.llm_vision?.model && <span className="healthModel">{health.llm_vision.model}</span>}
-          </div>
+        <div className="dayChips">
+          {dayChips.map((chip) => (
+            <button
+              key={chip.date}
+              type="button"
+              className={`dayChip${chip.date === date ? " active" : ""}`}
+              onClick={() => setDate(chip.date)}
+            >
+              <span className="dayChipLabel">{chip.label}</span>
+              <span className={`dayChipCount${chip.count ? " has" : ""}`}>{chip.count}</span>
+            </button>
+          ))}
         </div>
-        {healthError && <div className="error">{healthError}</div>}
-        {(health?.llm_text?.error || health?.llm_vision?.error) && (
-          <details className="healthDetails">
-            <summary>查看错误摘要</summary>
-            {health?.llm_text?.error && <p>文本模型：{health.llm_text.error}</p>}
-            {health?.llm_vision?.error && <p>视觉模型：{health.llm_vision.error}</p>}
-          </details>
+      </section>
+
+      {savedFlash && <div className="card flashHint successHint">{savedFlash}</div>}
+
+      <section className="card">
+        <div className="cardHead">
+          <h3 className="sectionTitle">{date} 的日报</h3>
+          <span className="badge">{recordsForDate.length} 条</span>
+        </div>
+
+        {loading && recordsForDate.length === 0 ? (
+          <div className="hint">加载中...</div>
+        ) : recordsForDate.length === 0 ? (
+          <div className="emptyState">
+            <p className="emptyStateTitle">{isViewingToday ? "今天还没有日报" : "该日期暂无日报"}</p>
+            <p className="hint">在下方填写工作描述，点击保存即自动入库并生成 AI 摘要。</p>
+          </div>
+        ) : (
+          <div className="recordList">
+            {recordsForDate.map((r) => (
+              <RecordCard
+                key={r.id}
+                record={r}
+                onChange={handleCardChange}
+                onDelete={handleCardDelete}
+                defaultExpand={recordsForDate.length === 1}
+              />
+            ))}
+          </div>
         )}
+
+        {listError && <div className="error">{listError}</div>}
       </section>
 
       <section className="card">
-        <h3 className="sectionTitle">文字日报（入库 + AI 摘要）</h3>
-        <div className="fieldRow">
-          <div className="field">
-            <label htmlFor="record-date">日期</label>
-            <input id="record-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-        </div>
-        <div className="field">
-          <label htmlFor="raw-text">工作描述</label>
-          <textarea
-            id="raw-text"
-            rows={4}
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-            placeholder="今日推进、结果与阻塞等"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="chat-text">对话 / 纪要摘录</label>
-          <textarea
-            id="chat-text"
-            rows={3}
-            value={chatText}
-            onChange={(e) => setChatText(e.target.value)}
-            placeholder="可选"
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="screenshot-notes">截图说明（纯文字）</label>
-          <textarea
-            id="screenshot-notes"
-            rows={2}
-            value={screenshotNotes}
-            onChange={(e) => setScreenshotNotes(e.target.value)}
-            placeholder="若暂无截图，可在此补充上下文"
-          />
-        </div>
-        <div className="actions">
-          <button className="btnPrimary" type="button" onClick={() => void saveTextRecord()} disabled={isSaving}>
-            {isSaving ? "保存中..." : "保存文字日报"}
-          </button>
-        </div>
-        {saveMsg && <div className="hint successHint">{saveMsg}</div>}
+        <h3 className="sectionTitle">
+          {recordsForDate.length === 0 ? "新建日报" : `为 ${date} 再加一条`}
+        </h3>
+        <RecordForm
+          defaultDate={date}
+          lockDate
+          defaultExpanded={false}
+          onSubmit={handleCreate}
+          submitLabel="保存日报"
+          pendingLabel="保存中（AI 摘要生成中）..."
+          externalRawText={externalRaw ?? undefined}
+          resetAfterSubmit
+        />
+        {createError && <div className="error">{createError}</div>}
+        <p className="hint" style={{ marginTop: 12 }}>
+          提示：保存时会自动调用 AI 生成摘要与标签；如需修改，保存后在上方卡片中点击「编辑 / 重新分析」。
+        </p>
       </section>
 
-      <section className="card">
-        <h3 className="sectionTitle">截图解析 Markdown</h3>
-        <div className="field">
-          <label htmlFor="screenshot-file">截图上传（本地）</label>
-          <input
-            ref={fileInputRef}
-            id="screenshot-file"
-            type="file"
-            accept="image/*"
-            className="hiddenInput"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                setSelectedFile(file);
-                setError("");
-              }
-            }}
-          />
-          <button
-            type="button"
-            className={`dropzone ${isDragOver ? "dragOver" : ""}`}
-            onClick={() => fileInputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragOver(true);
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              setIsDragOver(false);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragOver(false);
-              const file = e.dataTransfer.files?.[0];
-              if (file) {
-                setSelectedFile(file);
-                setError("");
-              }
-            }}
-          >
-            <span>{isSubmitting ? "正在解析图片..." : "拖拽截图到这里，或点击选择文件"}</span>
-          </button>
-          <div className="hint">{selectedFile ? `已选择：${selectedFile.name}` : "支持图片文件，图片不会上传到 Supabase。"} </div>
-        </div>
+      <ScreenshotHelper date={date} onMarkdown={handleMergeMarkdown} />
 
-        <div className="actions">
-          <button className="btnPrimary" onClick={submit} disabled={isSubmitting}>
-            {isSubmitting ? "AI 解析中..." : "解析图片并生成 Markdown"}
-          </button>
-        </div>
-        {error && <div className="error">{error}</div>}
-      </section>
-
-      <section className="card result">
-        <h3>Markdown 文档</h3>
-        <pre>{result || "提交后将显示 AI 生成的 Markdown 纪要"}</pre>
-      </section>
+      <HealthBanner />
     </>
   );
+}
+
+function sortRecords(rows: DailyRecordDto[]): DailyRecordDto[] {
+  return [...rows].sort((a, b) => {
+    if (a.record_date !== b.record_date) {
+      return a.record_date < b.record_date ? 1 : -1;
+    }
+    return b.id - a.id;
+  });
+}
+
+function weekdayLabel(ymd: string): string {
+  const map = ["日", "一", "二", "三", "四", "五", "六"];
+  const d = new Date(`${ymd}T00:00:00`);
+  return `周${map[d.getDay()]}`;
 }
