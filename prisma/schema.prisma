@@ -1,0 +1,69 @@
+// MyBroker — PostgreSQL 表结构与历史 Alembic 迁移保持一致
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model DailyRecord {
+  id                  Int      @id @default(autoincrement())
+  recordDate          DateTime @map("record_date") @db.Date
+  rawText             String   @default("") @map("raw_text")
+  chatText            String   @default("") @map("chat_text")
+  screenshotPathsJson String   @default("[]") @map("screenshot_paths_json")
+  screenshotNotes     String   @default("") @map("screenshot_notes")
+  analysisSummary     String   @default("") @map("analysis_summary")
+  tagsJson            String   @default("[]") @map("tags_json")
+  createdAt           DateTime @map("created_at")
+  updatedAt           DateTime @map("updated_at")
+
+  @@index([recordDate])
+  @@map("daily_records")
+}
+
+model ActionItem {
+  id              Int       @id @default(autoincrement())
+  sourceRecordId  Int       @map("source_record_id")
+  sourceDate      DateTime  @map("source_date") @db.Date
+  content         String
+  priority        String    @default("medium")
+  status          String    @default("todo")
+  dueDate         DateTime? @map("due_date") @db.Date
+  notes           String    @default("")
+  createdAt       DateTime  @map("created_at")
+  updatedAt       DateTime  @map("updated_at")
+
+  @@index([sourceRecordId])
+  @@index([sourceDate])
+  @@map("action_items")
+}
+
+model NotificationLog {
+  id              Int      @id @default(autoincrement())
+  channel         String
+  title           String
+  content         String   @default("")
+  success         Int      @default(0)
+  responseMessage String   @default("") @map("response_message")
+  attempts        Int      @default(1)
+  createdAt       DateTime @map("created_at")
+
+  @@map("notification_logs")
+}
+
+model LlmCallLog {
+  id           Int      @id @default(autoincrement())
+  scenario     String   @default("summary")
+  model        String   @default("")
+  promptDigest String   @default("") @map("prompt_digest")
+  latencyMs    Int      @default(0) @map("latency_ms")
+  status       String   @default("unknown")
+  errorMessage String   @default("") @map("error_message")
+  createdAt    DateTime @map("created_at")
+
+  @@map("llm_call_logs")
+}

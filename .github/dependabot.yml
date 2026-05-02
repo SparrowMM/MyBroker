@@ -1,0 +1,39 @@
+# 依赖更新 PR：https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 12
+    labels:
+      - dependencies
+    groups:
+      next-core:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+      prisma:
+        patterns:
+          - "@prisma/client"
+          - "prisma"
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+      - github-actions

@@ -1,16 +1,20 @@
-# Python cache and artifacts
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+.eslintcache
+*.tsbuildinfo
+
+# Python cache and artifacts（历史遗留，可清理）
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-
-# Virtual environments
 .venv/
 venv/
 env/
 ENV/
-
-# Test and coverage outputs
 .pytest_cache/
 .coverage
 .coverage.*
@@ -26,10 +30,6 @@ htmlcov/
 .idea/
 .DS_Store
 template/
-
-# Frontend dependencies and build artifacts
-frontend/node_modules/
-frontend/.next/
 
 # Local runtime data
 storage/*.db
