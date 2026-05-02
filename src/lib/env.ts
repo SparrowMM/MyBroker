@@ -1,6 +1,8 @@
 import type { NotifyChannel } from "@/lib/notify-channel";
 
-/** 兼容 OpenAI 的基址只应到 `/v1`，代码内会拼接 `/chat/completions`。若误填完整路径则去掉尾部避免重复。 */
+// 主用变量名为 BAILIAN_*；DASHSCOPE_* 作为向后兼容别名，功能相同，任填其一即可。
+
+/** 兼容 OpenAI 的基址只应到 `/v1`，代码内会拼接 `/chat/completions`。若误填完整路径则自动去尾。 */
 export function normalizeOpenAiCompatibleBaseUrl(raw: string): string {
   let u = raw.trim().replace(/\/+$/, "");
   const suffix = "/chat/completions";
@@ -30,6 +32,7 @@ export function getBailianVisionBaseUrl(): string {
   return normalizeOpenAiCompatibleBaseUrl(raw);
 }
 
+/** 视觉模型 key 若未单独配置，自动复用文本模型 key。 */
 export function getBailianVisionApiKey(): string {
   return (
     process.env.BAILIAN_VISION_API_KEY ||
@@ -59,6 +62,7 @@ export function getAgentProxySecret(): string {
 }
 
 export function getSupabaseUrl(): string {
+  // NEXT_PUBLIC_SUPABASE_URL 作为向后兼容别名（此变量纯服务端使用，NEXT_PUBLIC_ 前缀无必要）
   return process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 }
 

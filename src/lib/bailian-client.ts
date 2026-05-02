@@ -320,7 +320,7 @@ export async function imageToMarkdown(imageBytes: Buffer, mimeType: string, reco
   });
 }
 
-const missingKeyHint = "缺少 BAILIAN_API_KEY 或 DASHSCOPE_API_KEY（任填其一即可）";
+const missingKeyHint = "缺少 BAILIAN_API_KEY（旧别名 DASHSCOPE_API_KEY 亦可）";
 
 export async function probeTextModel(): Promise<{ ok: boolean; error: string }> {
   if (!getBailianApiKey()) {
@@ -353,7 +353,7 @@ export async function probeVisionModel(): Promise<{ ok: boolean; error: string }
     return { ok: false, error: missingKeyHint };
   }
   if (!getBailianVisionModel()) {
-    return { ok: false, error: "缺少 BAILIAN_VISION_MODEL 或 DASHSCOPE_VISION_MODEL" };
+    return { ok: false, error: "缺少 BAILIAN_VISION_MODEL（旧别名 DASHSCOPE_VISION_MODEL 亦可）" };
   }
   const sampleImageUrl =
     "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241022/emyrja/dog_and_girl.jpeg";
