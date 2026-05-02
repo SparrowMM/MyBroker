@@ -25,7 +25,7 @@ export async function GET() {
   const supabaseError = supabaseOk ? "" : "缺少 SUPABASE_URL 或 SUPABASE_SERVICE_ROLE_KEY";
 
   const bailianOk = Boolean(getBailianApiKey());
-  const bailianError = bailianOk ? "" : "缺少 BAILIAN_API_KEY";
+  const bailianError = bailianOk ? "" : "缺少 BAILIAN_API_KEY 或 DASHSCOPE_API_KEY";
 
   const textProbe = await probeTextModel();
   const visionProbe = await probeVisionModel();

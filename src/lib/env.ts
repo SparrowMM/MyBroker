@@ -1,23 +1,33 @@
 import type { NotifyChannel } from "@/lib/notify-channel";
 
+/** 兼容 OpenAI 的基址只应到 `/v1`，代码内会拼接 `/chat/completions`。若误填完整路径则去掉尾部避免重复。 */
+export function normalizeOpenAiCompatibleBaseUrl(raw: string): string {
+  let u = raw.trim().replace(/\/+$/, "");
+  const suffix = "/chat/completions";
+  if (u.toLowerCase().endsWith(suffix)) {
+    u = u.slice(0, -suffix.length).replace(/\/+$/, "");
+  }
+  return u;
+}
+
 export function getBailianApiKey(): string {
   return process.env.BAILIAN_API_KEY || process.env.DASHSCOPE_API_KEY || "";
 }
 
 export function getBailianBaseUrl(): string {
-  return (
+  const raw =
     process.env.BAILIAN_BASE_URL ||
     process.env.DASHSCOPE_BASE_URL ||
-    "https://coding.dashscope.aliyuncs.com/v1"
-  ).replace(/\/$/, "");
+    "https://coding.dashscope.aliyuncs.com/v1";
+  return normalizeOpenAiCompatibleBaseUrl(raw);
 }
 
 export function getBailianVisionBaseUrl(): string {
-  return (
+  const raw =
     process.env.BAILIAN_VISION_BASE_URL ||
     process.env.DASHSCOPE_VISION_BASE_URL ||
-    "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  ).replace(/\/$/, "");
+    "https://dashscope.aliyuncs.com/compatible-mode/v1";
+  return normalizeOpenAiCompatibleBaseUrl(raw);
 }
 
 export function getBailianVisionApiKey(): string {

@@ -6,6 +6,7 @@ import {
   getBailianVisionApiKey,
   getBailianVisionBaseUrl,
   getBailianVisionModel,
+  normalizeOpenAiCompatibleBaseUrl,
 } from "@/lib/env";
 
 type ChatContentPart =
@@ -114,7 +115,7 @@ export async function chatWithStatus(
     return { content: "", error: "missing_api_key" };
   }
 
-  let baseUrl = (options.baseUrlOverride ?? getBailianBaseUrl()).replace(/\/$/, "");
+  let baseUrl = normalizeOpenAiCompatibleBaseUrl(options.baseUrlOverride ?? getBailianBaseUrl());
   const url = `${baseUrl}/chat/completions`;
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,
@@ -177,7 +178,7 @@ export async function chatWithStatus(
       resp.status === 401 ||
       resp.status === 403
     ) {
-      const originalUrl = (options.baseUrlOverride ?? getBailianBaseUrl()).replace(/\/$/, "");
+      const originalUrl = normalizeOpenAiCompatibleBaseUrl(options.baseUrlOverride ?? getBailianBaseUrl());
       if (originalUrl.includes("dashscope.aliyuncs.com/compatible-mode")) {
         resp = await post("https://coding.dashscope.aliyuncs.com/v1/chat/completions");
         baseUrl = "https://coding.dashscope.aliyuncs.com/v1";
@@ -319,9 +320,11 @@ export async function imageToMarkdown(imageBytes: Buffer, mimeType: string, reco
   });
 }
 
+const missingKeyHint = "缺少 BAILIAN_API_KEY 或 DASHSCOPE_API_KEY（任填其一即可）";
+
 export async function probeTextModel(): Promise<{ ok: boolean; error: string }> {
   if (!getBailianApiKey()) {
-    return { ok: false, error: "缺少 BAILIAN_API_KEY" };
+    return { ok: false, error: missingKeyHint };
   }
   const { content, error } = await chatWithStatus(
     [
@@ -336,7 +339,10 @@ export async function probeTextModel(): Promise<{ ok: boolean; error: string }> 
       maxTokens: 8,
     },
   );
-  if (error && error !== "missing_api_key") {
+  if (error === "missing_api_key") {
+    return { ok: false, error: missingKeyHint };
+  }
+  if (error) {
     return { ok: false, error };
   }
   return { ok: Boolean(content), error: content ? "" : "模型返回空内容" };
@@ -344,13 +350,10 @@ export async function probeTextModel(): Promise<{ ok: boolean; error: string }> 
 
 export async function probeVisionModel(): Promise<{ ok: boolean; error: string }> {
   if (!getBailianApiKey()) {
-    return { ok: false, error: "缺少 BAILIAN_API_KEY" };
+    return { ok: false, error: missingKeyHint };
   }
   if (!getBailianVisionModel()) {
-    return { ok: false, error: "缺少 BAILIAN_VISION_MODEL" };
-  }
-  if (!getBailianVisionApiKey()) {
-    return { ok: false, error: "缺少 BAILIAN_VISION_API_KEY" };
+    return { ok: false, error: "缺少 BAILIAN_VISION_MODEL 或 DASHSCOPE_VISION_MODEL" };
   }
   const sampleImageUrl =
     "https://help-static-aliyun-doc.aliyuncs.com/file-manage-files/zh-CN/20241022/emyrja/dog_and_girl.jpeg";
@@ -375,7 +378,10 @@ export async function probeVisionModel(): Promise<{ ok: boolean; error: string }
       maxTokens: 8,
     },
   );
-  if (error && error !== "missing_api_key") {
+  if (error === "missing_api_key") {
+    return { ok: false, error: missingKeyHint };
+  }
+  if (error) {
     return { ok: false, error };
   }
   return { ok: Boolean(content), error: content ? "" : "模型返回空内容" };
