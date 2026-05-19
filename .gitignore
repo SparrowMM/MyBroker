@@ -25,6 +25,9 @@ htmlcov/
 .env.*
 !.env.example
 
+# Agent skills（如 `npx skills add supabase/agent-skills`，本机生成，不提交）
+.agents/
+
 # IDE and OS files
 .vscode/
 .idea/

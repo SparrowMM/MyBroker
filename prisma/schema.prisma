@@ -5,8 +5,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Supabase: :6543 pooler for app; :5432 direct for `prisma migrate` / `db push` (same as finchledger).
+  directUrl = env("DIRECT_URL")
 }
 
 model DailyRecord {

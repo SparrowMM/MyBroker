@@ -16,7 +16,10 @@
     "test:watch": "vitest",
     "check": "npm run lint && npm run typecheck && npm run test",
     "db:migrate": "prisma migrate deploy",
-    "db:push": "prisma db push"
+    "db:push": "prisma db push",
+    "db:validate:local": "node --env-file=.env.local ./node_modules/.bin/prisma validate",
+    "db:migrate:local": "node --env-file=.env.local ./node_modules/.bin/prisma migrate deploy",
+    "db:push:local": "node --env-file=.env.local ./node_modules/.bin/prisma db push"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
