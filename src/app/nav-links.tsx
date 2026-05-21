@@ -4,14 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const links = [
-  { href: "/records", label: "日报录入" },
-  { href: "/records/history", label: "日报列表" },
-  { href: "/dashboard", label: "数据看板" },
-  { href: "/action-items", label: "待办" },
-  { href: "/notifications", label: "每日推送" },
-  { href: "/analysis", label: "日报分析" },
-  { href: "/reports", label: "周月报表" },
-  { href: "/projects", label: "项目判断" },
+  { href: "/today", label: "今天" },
+  { href: "/history", label: "历史" },
+  { href: "/settings", label: "设置" },
 ];
 
 /** 最长路径优先，避免 `/records` 抢走 `/records/history` 的高亮 */

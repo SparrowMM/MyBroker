@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
 
 const description =
-  "经纪人后台与私人助理：日报录入、分析洞察、周期报表与项目归类建议。";
+  "个人工作记忆与 AI 经纪人：记录、优先级、日终复盘。";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MyBroker 智能工作台",
+    name: "MyBroker",
     short_name: "MyBroker",
     description,
     start_url: "/",

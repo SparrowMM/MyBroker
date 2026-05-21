@@ -44,8 +44,9 @@ API_BASE=http://127.0.0.1:3000 ./scripts/acceptance_phase1.sh
 
 ## 人工补充验收
 
-- 打开 <http://127.0.0.1:3000>：应跳转到 `/dashboard`。
-- 打开 <http://127.0.0.1:3000/records>：上传本地截图，解析 Markdown（不上传 Supabase，除非另行接入上传接口）。
+- 打开 <http://127.0.0.1:3000>：应跳转到 `/today`。
+- 在 `/today` 上传本地截图，解析 Markdown 并合入记录（不上传 Supabase，除非另行接入上传接口）。
+- 调用 `GET /api/v2/broker/today-priorities` 与 `GET /api/v2/broker/daily-review`（有记录时返回 JSON）。
 - 打开 `analysis` / `reports` / `projects` 页面验证查询。
 - 在 Supabase 控制台验证（若使用上传）：对应 bucket 下有截图对象；`daily_records` 有新增行。
 

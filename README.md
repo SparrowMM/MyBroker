@@ -1,6 +1,6 @@
 # MyBroker
 
-MyBroker 是「经纪人后台 + 私人助理 Agent」MVP：沉淀每日截图与文字记录，输出按日/周/月的分析与项目归类建议。
+MyBroker 是个人用的「工作记忆 + AI 经纪人」：用文字/截图记录每天的事，由经纪人排优先级、做日终复盘并给出生活与工作建议。实现进度见 [docs/implementation-progress.md](docs/implementation-progress.md)。
 
 ## 架构（对齐 finchledger 风格）
 
@@ -42,7 +42,7 @@ npx prisma migrate deploy
 npm run dev
 ```
 
-- 产品界面：<http://127.0.0.1:3000>（默认跳转 `/dashboard`）；写日报见 `/records`
+- 产品界面：<http://127.0.0.1:3000>（默认跳转 **`/today`**）；历史见 **`/history`**；设置见 **`/settings`**
 - 轻量探活（不查库）：<http://127.0.0.1:3000/api/health>；依赖与 LLM 探测：<http://127.0.0.1:3000/api/v2/system/health>
 - PWA 清单：<http://127.0.0.1:3000/manifest.webmanifest>（「添加到主屏幕」时用）
 
@@ -70,6 +70,8 @@ npm run dev
 | 待办列表 / 统计 / 同步 / 提醒 | GET/POST | `/api/v2/action-items`、`/stats`、`/sync?days=14`、`/reminders/daily` |
 | 待办更新 | PATCH | `/api/v2/action-items/[id]` |
 | 晨会简报 | GET | `/api/v2/briefings/morning` |
+| 经纪人 · 今日优先级 | GET/POST | `/api/v2/broker/today-priorities?date=YYYY-MM-DD`（`refresh=1` 强制重算） |
+| 经纪人 · 日终复盘 | GET/POST | `/api/v2/broker/daily-review?date=YYYY-MM-DD`（`refresh=1` 强制重算） |
 | 每日推送预览 | GET | `/api/v2/notifications/preview/daily?channel=wecom` |
 | 手动推送 | POST | `/api/v2/notifications/send/daily?channel=wecom`（可选 JSON：`{"markdown":"..."}` 覆盖正文） |
 | 推送日志 | GET | `/api/v2/notifications/logs?limit=50` |

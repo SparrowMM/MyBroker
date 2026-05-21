@@ -69,3 +69,15 @@ model LlmCallLog {
 
   @@map("llm_call_logs")
 }
+
+/// 经纪人日终复盘与今日优先级缓存（按自然日一条）
+model DailyReview {
+  id              Int      @id @default(autoincrement())
+  reviewDate      DateTime @unique @map("review_date") @db.Date
+  prioritiesJson  String   @default("{}") @map("priorities_json")
+  reviewMarkdown  String   @default("") @map("review_markdown")
+  createdAt       DateTime @map("created_at")
+  updatedAt       DateTime @map("updated_at")
+
+  @@map("daily_reviews")
+}

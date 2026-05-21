@@ -5,22 +5,22 @@ import { getSiteOrigin } from "@/lib/site-url";
 import NavLinks from "./nav-links";
 
 const defaultDescription =
-  "经纪人后台与私人助理：日报录入、分析洞察、周期报表与项目归类建议。";
+  "个人工作记忆与 AI 经纪人：记录每天的事，排优先级、日终复盘与生活工作建议。";
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteOrigin()),
-  title: { default: "MyBroker 智能工作台", template: "%s · MyBroker" },
+  title: { default: "MyBroker", template: "%s · MyBroker" },
   description: defaultDescription,
   openGraph: {
     type: "website",
     locale: "zh_CN",
     siteName: "MyBroker",
-    title: "MyBroker 智能工作台",
+    title: "MyBroker",
     description: defaultDescription,
   },
   twitter: {
     card: "summary",
-    title: "MyBroker 智能工作台",
+    title: "MyBroker",
     description: defaultDescription,
   },
 };
@@ -37,8 +37,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <div className="layout">
           <div className="hero">
-            <h1>MyBroker 智能工作台</h1>
-            <p>统一录入日报、生成分析洞察、查看周期报表与项目归类建议，提升日常经营管理效率。</p>
+            <h1>MyBroker</h1>
+            <p>记下每天的事（文字或截图），由经纪人帮你排优先级、做日终复盘，并给出生活与工作建议。</p>
             <NavLinks />
           </div>
           <main className="page">{children}</main>

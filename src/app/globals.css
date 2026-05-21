@@ -978,3 +978,143 @@ pre {
   font-size: 14px;
   color: #334155;
 }
+
+/* ===== 个人版：今天 / 经纪人 ===== */
+
+.statusLine {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.bannerError {
+  margin-bottom: 12px;
+}
+
+.brokerCard {
+  border-left: 4px solid var(--brand);
+}
+
+.brokerNote {
+  margin: 0 0 12px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.priorityList {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 12px;
+}
+
+.priorityList li {
+  line-height: 1.45;
+}
+
+.kindTag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-right: 8px;
+  background: #e0e7ff;
+  color: #1e40af;
+}
+
+.kind-life {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.kind-mixed {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.blockHint {
+  display: block;
+  margin-top: 4px;
+}
+
+.decisionBox {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+}
+
+.decisionBox ul {
+  margin: 8px 0;
+  padding-left: 1.2rem;
+}
+
+.subtleBadge {
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.reviewMarkdown {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.todoList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.todoRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.prioDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  background: #94a3b8;
+}
+
+.prio-high {
+  background: #dc2626;
+}
+
+.prio-medium {
+  background: #f59e0b;
+}
+
+.historyRecordList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.historySummary {
+  margin: 0 0 6px;
+  line-height: 1.45;
+}
+
+.bulletList {
+  margin: 8px 0;
+  padding-left: 1.2rem;
+}
+
+.dayHistoryCard + .dayHistoryCard {
+  margin-top: 0;
+}
