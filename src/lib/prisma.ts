@@ -26,14 +26,27 @@ if (
 
 const resolvedDatabaseUrl = withPgbouncerParamForPooler(process.env.DATABASE_URL);
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function createPrismaClient(): PrismaClient {
+  return new PrismaClient({
     ...(resolvedDatabaseUrl !== undefined
       ? { datasources: { db: { url: resolvedDatabaseUrl } } }
       : {}),
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
+}
+
+/** schema 变更后 dev 热重载可能仍持有旧 Client（缺少新 model delegate） */
+function isStaleDevClient(client: PrismaClient | undefined): boolean {
+  if (!client || process.env.NODE_ENV === "production") return false;
+  return typeof (client as PrismaClient & { dailyReview?: unknown }).dailyReview === "undefined";
+}
+
+let cached = globalForPrisma.prisma;
+if (isStaleDevClient(cached)) {
+  cached = undefined;
+}
+
+export const prisma = cached ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
