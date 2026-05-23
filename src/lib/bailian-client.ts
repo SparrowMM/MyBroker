@@ -255,7 +255,7 @@ export async function summarizeText(prompt: string): Promise<string> {
       { role: "system", content: "你是专业经纪人助理，输出简洁、可执行中文结论。" },
       { role: "user", content: prompt },
     ],
-    { temperature: 0.3, scenario: "daily_summary" },
+    { temperature: 0.3, scenario: "daily_summary", timeoutSec: 60 },
   );
 }
 
@@ -268,7 +268,7 @@ export async function summarizePeriod(periodLabel: string, summaries: string[], 
       { role: "system", content: "你是专业经纪人助理，输出简洁、可执行中文结论。" },
       { role: "user", content: prompt },
     ],
-    { temperature: 0.3, scenario: "period_summary" },
+    { temperature: 0.3, scenario: "period_summary", timeoutSec: 60 },
   );
 }
 
@@ -299,7 +299,15 @@ export async function decideProjectJson(
 }
 
 export async function imageToMarkdown(imageBytes: Buffer, mimeType: string, recordDate: string): Promise<string> {
-  const prompt = `请根据这张日报截图提取关键信息并输出 Markdown 文档（日期：${recordDate}）。\n要求：\n1) 仅输出 Markdown，不要输出额外解释；\n2) 结构包含：# 标题、## 今日进展、## 风险与阻塞、## 明日计划、## 待确认事项；\n3) 每个小节使用项目符号，信息缺失时写“待补充”；\n4) 内容务必忠于截图，不要编造金额/客户名等细节。`;
+  const prompt = `请根据这张日报/工作记录截图提取关键信息并输出 Markdown（参考日期：${recordDate}）。
+
+要求：
+1) 仅输出 Markdown，不要输出额外解释；
+2) 识别截图中的全部区块，不要丢弃任何可见信息；若存在「当前工作打标 / 工作优先级 / 重点事情 / P1-P5 标签」等战略信息，单独输出为 ## 工作优先级，保留 P 级、重要/紧急标签与「重点事情」列表；
+3) 将「每日输出 / 今日完成」等内容映射为 ## 今日进展，保持原文层级（项目、耗时、@人、链接、嵌套子项）；
+4) 仅当截图中明确出现风险/阻塞、明日计划、待确认/待办时，才输出对应 ## 小节；没有则不写该小节；
+5) 禁止输出「待补充」或空章节；禁止编造截图中未出现的金额、客户名或结论；
+6) 标题 # 优先使用截图内日期（如 2026.05.22 → # 2026-05-22 工作日报），截图无日期时用 ${recordDate}。`;
   const base64Image = imageBytes.toString("base64");
   const messages: ChatMessage[] = [
     { role: "system", content: "你是专业经纪人助理，擅长从业务截图提炼结构化纪要。" },

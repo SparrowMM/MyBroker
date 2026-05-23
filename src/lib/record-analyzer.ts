@@ -1,4 +1,5 @@
 import { summarizePeriod as llmSummarizePeriod, summarizeText } from "@/lib/bailian-client";
+import { dedupeDailyReportText, parseDailyRecordMarkdown } from "@/lib/daily-record-structure";
 
 const TAG_KEYWORDS: Record<string, string[]> = {
   客户沟通: ["客户", "沟通", "电话", "会议", "跟进"],
@@ -34,7 +35,9 @@ export async function analyzeDaily(
   chatText: string,
   screenshotNotes: string,
 ): Promise<{ summary: string; tags: string[] }> {
-  const merged = [rawText.trim(), chatText.trim(), screenshotNotes.trim()].filter(Boolean).join("\n").trim();
+  const merged = dedupeDailyReportText(
+    [rawText.trim(), chatText.trim(), screenshotNotes.trim()].filter(Boolean).join("\n").trim(),
+  );
   const tags = extractTags(merged);
 
   const prompt = `请分析经纪人工作记录，输出一句中文总结。日期: ${recordDate.toISOString().slice(0, 10)}\n记录内容:\n${merged}\n要求: 聚焦结果、风险与下一步。`;
@@ -43,10 +46,26 @@ export async function analyzeDaily(
     return { summary: llmSummary.trim(), tags };
   }
 
-  const textLen = merged.length;
+  const ymd = recordDate.toISOString().slice(0, 10);
+  const parsed = parseDailyRecordMarkdown(merged);
+  const projectNames = parsed.projects.map((p) => p.name.replace(/^✅\s*/, "").trim()).filter(Boolean);
+  if (projectNames.length) {
+    const pending = parsed.sections.pending[0];
+    const tail = pending ? `；待确认：${pending.slice(0, 48)}` : "";
+    return {
+      summary: `${ymd} 推进 ${projectNames.slice(0, 4).join("、")} 等 ${projectNames.length} 条线${tail}。`,
+      tags,
+    };
+  }
+  if (parsed.sections.progress.length) {
+    const top = parsed.sections.progress.slice(0, 3).join("；");
+    return { summary: `${ymd} ${top.slice(0, 120)}。`, tags };
+  }
   const focus = tags.slice(0, 3).join("、");
-  const summary = `${recordDate.toISOString().slice(0, 10)} 主要围绕 ${focus} 开展工作，已沉淀 ${textLen} 字记录。建议明日优先处理高优先级客户跟进与关键事项闭环。`;
-  return { summary, tags };
+  return {
+    summary: `${ymd} 围绕 ${focus} 记录 ${merged.length} 字；建议补全项目名与明日计划便于复盘。`,
+    tags,
+  };
 }
 
 function topTagsFromLists(tagsList: string[][]): string[] {

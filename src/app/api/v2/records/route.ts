@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dailyRecordToJson } from "@/lib/daily-record-json";
+import { dedupeDailyReportText } from "@/lib/daily-record-structure";
 import { analyzeDaily } from "@/lib/record-analyzer";
 import { parseYmd } from "@/lib/parse-ymd";
 import { jsonErrorResponse } from "@/lib/api-error";
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const rawText = String(payload.raw_text ?? "");
+  const rawText = dedupeDailyReportText(String(payload.raw_text ?? ""));
   const chatText = String(payload.chat_text ?? "");
   const screenshotNotes = String(payload.screenshot_notes ?? "");
   const screenshotPathsRaw = payload.screenshot_paths;

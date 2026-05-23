@@ -1065,6 +1065,340 @@ pre {
   overflow: auto;
 }
 
+/* ========== 日终复盘 · 三视图面板 ========== */
+.reviewPanel {
+  margin-top: 4px;
+}
+
+.reviewPanelToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.reviewSaveImageBtn {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.reviewSaveError {
+  margin: -4px 0 10px;
+  color: #b91c1c;
+}
+
+.reviewModeTabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+}
+
+.reviewTab {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.reviewTab:hover {
+  color: var(--text);
+}
+
+.reviewTabActive {
+  background: #fff;
+  color: var(--brand);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+
+/* —— 卡片视图 —— */
+.reviewCardsLayout {
+  max-height: 520px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.reviewDocHead {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.reviewDocTitle {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: #1e293b;
+  font-family: inherit;
+}
+
+.reviewDocQuote {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.reviewCardsStack {
+  display: grid;
+  gap: 12px;
+}
+
+.reviewSectionCard {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #fff 0%, #faf9f7 100%);
+  overflow: hidden;
+}
+
+.reviewSectionCard--closing {
+  border-color: #c7d2fe;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+}
+
+.reviewSectionCard--life {
+  border-color: #bbf7d0;
+  background: linear-gradient(135deg, #fafff9 0%, #f0fdf4 100%);
+}
+
+.reviewSectionCard--pending {
+  border-color: #fde68a;
+  background: linear-gradient(135deg, #fffef8 0%, #fffbeb 100%);
+}
+
+.reviewSectionHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.03);
+  border-bottom: 1px solid var(--line);
+}
+
+.reviewSectionIcon {
+  font-size: 14px;
+  color: var(--brand);
+  opacity: 0.85;
+}
+
+.reviewSectionTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #475569;
+}
+
+.reviewSectionBody {
+  padding: 12px 14px 14px;
+}
+
+.reviewCardPara {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #334155;
+}
+
+.reviewCardPara:last-child {
+  margin-bottom: 0;
+}
+
+.reviewCardList {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.reviewCardList li {
+  margin-bottom: 6px;
+}
+
+.reviewCheckItem::marker {
+  content: "▢ ";
+}
+
+.reviewWorkbenchGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .reviewWorkbenchGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.reviewLane {
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-height: 72px;
+}
+
+.reviewLane--light {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.reviewLane--fog {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+}
+
+.reviewLane--lamp {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.reviewLaneTitle {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.reviewLaneList {
+  margin: 0;
+  padding-left: 1rem;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #1e293b;
+}
+
+.reviewLaneList li {
+  margin-bottom: 4px;
+}
+
+.reviewLaneEmpty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* —— Markdown 预览 —— */
+.reviewMdShell {
+  max-height: 520px;
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 14px;
+}
+
+.reviewMdPaper {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+  padding: 20px 22px 24px;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.75;
+  color: #292524;
+}
+
+.reviewCaptureRoot {
+  font-family: inherit;
+  background: #fff;
+  border-radius: 10px;
+}
+
+.reviewMdPaper .mdH2 {
+  margin: 0 0 1.2rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #1c1917;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e7e5e4;
+}
+
+.reviewMdPaper .mdH3 {
+  margin: 1.4rem 0 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #78716c;
+}
+
+.reviewMdPaper .mdH3:first-child {
+  margin-top: 0;
+}
+
+.reviewMdPaper .mdP {
+  margin: 0 0 0.9rem;
+}
+
+.reviewMdPaper .mdLabel {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #57534e;
+}
+
+.reviewMdPaper .mdQuote {
+  margin: 0 0 1rem;
+  padding: 0.5rem 0 0.5rem 0.85rem;
+  border-left: 3px solid #a8a29e;
+  color: #78716c;
+  font-style: italic;
+  font-size: 0.92em;
+}
+
+.reviewMdPaper .mdList {
+  margin: 0 0 1rem;
+  padding-left: 1.2rem;
+}
+
+.reviewMdPaper .mdList li {
+  margin-bottom: 0.4rem;
+}
+
+.reviewMdPaper .mdCheck::marker {
+  content: "☐ ";
+}
+
+.reviewMdPaper strong {
+  color: #44403c;
+}
+
+.reviewMdPaper code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.88em;
+  background: #f5f5f4;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+/* —— 原文 —— */
+.reviewSource {
+  margin: 0;
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
 .todoList {
   list-style: none;
   margin: 0;

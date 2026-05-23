@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getJson, patchJson, postJson } from "@/lib/api";
-import { todayLocalYmd } from "@/lib/local-date";
+import { useTodayYmd } from "@/lib/use-today-ymd";
 import { RecordCard } from "@/app/records/_components/record-card";
 import { RecordForm } from "@/app/records/_components/record-form";
 import { ScreenshotHelper } from "@/app/records/_components/screenshot-helper";
 import type { DailyRecordDto, RecordPayload } from "@/app/records/_components/types";
 import type { BrokerDailyReview, BrokerPriorities } from "@/lib/broker-types";
+import { ReviewPanel } from "@/app/_components/review-panel";
 
 type ActionRow = {
   id: number;
@@ -18,7 +19,7 @@ type ActionRow = {
 };
 
 export default function TodayPage() {
-  const today = todayLocalYmd();
+  const today = useTodayYmd();
   const [records, setRecords] = useState<DailyRecordDto[]>([]);
   const [todos, setTodos] = useState<ActionRow[]>([]);
   const [priorities, setPriorities] = useState<BrokerPriorities | null>(null);
@@ -37,6 +38,8 @@ export default function TodayPage() {
     mode: "append" | "replace";
     nonce: number;
   } | null>(null);
+  const reviewReqRef = useRef(0);
+  const prioReqRef = useRef(0);
 
   const loadRecords = useCallback(async () => {
     const qs = new URLSearchParams({ record_date: today, limit: "100" });
@@ -64,49 +67,67 @@ export default function TodayPage() {
     }
   }, [loadRecords, loadTodos]);
 
-  useEffect(() => {
-    refreshCore().catch(() => undefined);
-  }, [refreshCore]);
-
-  const loadPriorities = async (refresh = false) => {
+  const loadPriorities = useCallback(async (refresh = false, forDate = today) => {
+    const reqId = ++prioReqRef.current;
     setPrioLoading(true);
     setError("");
     try {
       const path = refresh
-        ? `/api/v2/broker/today-priorities?date=${today}&refresh=1`
-        : `/api/v2/broker/today-priorities?date=${today}`;
+        ? `/api/v2/broker/today-priorities?date=${forDate}&refresh=1`
+        : `/api/v2/broker/today-priorities?date=${forDate}`;
       const res = await getJson<{ priorities: BrokerPriorities; cached: boolean }>(path);
+      if (reqId !== prioReqRef.current) return;
+      if (res.priorities.review_date !== forDate) return;
       setPriorities(res.priorities);
       setPrioritiesCached(res.cached);
     } catch (e) {
-      setError(String(e));
+      if (reqId === prioReqRef.current) setError(String(e));
     } finally {
-      setPrioLoading(false);
+      if (reqId === prioReqRef.current) setPrioLoading(false);
     }
-  };
+  }, [today]);
 
-  const loadReview = async (refresh = false) => {
+  const loadReview = useCallback(async (refresh = false, forDate = today): Promise<BrokerDailyReview | null> => {
+    const reqId = ++reviewReqRef.current;
     setReviewLoading(true);
     setError("");
     try {
       const path = refresh
-        ? `/api/v2/broker/daily-review?date=${today}&refresh=1`
-        : `/api/v2/broker/daily-review?date=${today}`;
+        ? `/api/v2/broker/daily-review?date=${forDate}&refresh=1`
+        : `/api/v2/broker/daily-review?date=${forDate}`;
       const res = await getJson<{ review: BrokerDailyReview; cached: boolean }>(path);
+      if (reqId !== reviewReqRef.current) return null;
+      if (res.review.review_date !== forDate) return null;
       setReview(res.review);
       setReviewCached(res.cached);
+      return res.review;
     } catch (e) {
-      setError(String(e));
+      if (reqId === reviewReqRef.current) setError(String(e));
+      return null;
     } finally {
-      setReviewLoading(false);
+      if (reqId === reviewReqRef.current) setReviewLoading(false);
     }
-  };
+  }, [today]);
+
+  const todayReview =
+    review?.review_date === today && review.markdown.trim() ? review : null;
+
+  const handleReviewClick = useCallback(async () => {
+    await loadReview(true, today);
+  }, [today, loadReview]);
 
   useEffect(() => {
-    loadPriorities(false).catch(() => undefined);
-    loadReview(false).catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅随日期加载经纪人缓存
-  }, [today]);
+    setRecords([]);
+    setPriorities(null);
+    setReview(null);
+    setPrioritiesCached(false);
+    setReviewCached(false);
+    setExternalRaw(null);
+    setFlash("");
+    setCreateError("");
+    void refreshCore();
+    void loadPriorities(false, today);
+  }, [today, refreshCore, loadPriorities]);
 
   const statusLine = useMemo(() => {
     const open = todos.length;
@@ -270,21 +291,26 @@ export default function TodayPage() {
       <section className="card brokerCard">
         <div className="cardHead">
           <h3 className="sectionTitle">经纪人 · 日终复盘</h3>
-          <span className="badge subtleBadge">{reviewCached ? "缓存" : "新生成"}</span>
+          <span className="badge subtleBadge">
+            {todayReview ? (reviewCached ? "缓存" : "新生成") : ""}
+            {todayReview ? ` · ${todayReview.source === "fallback" ? "结构化" : "AI"}` : ""}
+          </span>
         </div>
-        {review?.markdown ? (
-          <pre className="reviewMarkdown">{review.markdown}</pre>
+        {todayReview ? (
+          <ReviewPanel markdown={todayReview.markdown} exportDate={today} />
         ) : (
-          <p className="hint">{reviewLoading ? "生成复盘…" : "一天结束时点击生成，获取总结与生活/工作建议。"}</p>
+          <p className="hint">
+            {reviewLoading ? "加载复盘…" : "收工时点一下，换一版有画面感的夜谈复盘。"}
+          </p>
         )}
         <div className="actions">
           <button
             type="button"
             className="btnPrimary"
             disabled={reviewLoading}
-            onClick={() => void loadReview(true)}
+            onClick={() => void handleReviewClick()}
           >
-            {reviewLoading ? "生成中…" : review ? "重新生成复盘" : "生成今日复盘"}
+            {reviewLoading ? "生成中…" : todayReview ? "重新生成复盘" : "生成今日复盘"}
           </button>
         </div>
       </section>

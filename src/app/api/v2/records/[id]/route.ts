@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { dailyRecordToJson } from "@/lib/daily-record-json";
 import { parseYmd } from "@/lib/parse-ymd";
+import { dedupeDailyReportText } from "@/lib/daily-record-structure";
 import { analyzeDaily } from "@/lib/record-analyzer";
 import { jsonErrorResponse } from "@/lib/api-error";
 
@@ -60,7 +61,10 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
       recordDate = d;
     }
 
-    const rawText = payload.raw_text !== undefined ? String(payload.raw_text) : existing.rawText;
+    const rawText =
+      payload.raw_text !== undefined
+        ? dedupeDailyReportText(String(payload.raw_text))
+        : existing.rawText;
     const chatText = payload.chat_text !== undefined ? String(payload.chat_text) : existing.chatText;
     const screenshotNotes =
       payload.screenshot_notes !== undefined

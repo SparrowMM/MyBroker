@@ -1,6 +1,19 @@
 import { chat } from "@/lib/bailian-client";
 import { mergeRecordText } from "@/lib/action-items-logic";
 import type { BrokerDailyReview, BrokerPriorities, BrokerPriorityItem } from "@/lib/broker-types";
+import {
+  dedupeDailyReportText,
+  formatParsedRecordForBroker,
+  parseDailyRecordMarkdown,
+  type DailyRecordProject,
+  type ParsedDailyRecord,
+} from "@/lib/daily-record-structure";
+import {
+  BROKER_REVIEW_SYSTEM,
+  buildBrokerReviewUserPrompt,
+  reviewMarkdownMatchesDate,
+  REVIEW_HEADINGS,
+} from "@/lib/broker-review-voice";
 import { prisma } from "@/lib/prisma";
 import { decodeJsonList } from "@/lib/record-analyzer";
 import { ymdToUtcMidnight } from "@/lib/parse-ymd";
@@ -53,10 +66,20 @@ async function loadDayContext(ymd: string) {
   );
 
   const recordBlocks = records.map((r, i) => {
-    const merged = mergeRecordText(r.rawText, r.chatText, r.screenshotNotes);
+    const merged = dedupeDailyReportText(
+      mergeRecordText(r.rawText, r.chatText, r.screenshotNotes),
+    );
     const tags = decodeJsonList(r.tagsJson);
-    return `#${i + 1} 标签:${tags.join("、") || "无"}\n摘要:${r.analysisSummary || "（无）"}\n原文节选:${merged.slice(0, 800)}`;
+    const parsed = parseDailyRecordMarkdown(merged);
+    const structured = formatParsedRecordForBroker(parsed, tags);
+    return `#${i + 1}\n${structured}\n---\n原文节选（供核对细节）:\n${merged.slice(0, 3500)}`;
   });
+
+  const parsedRecords = records.map((r) =>
+    parseDailyRecordMarkdown(
+      dedupeDailyReportText(mergeRecordText(r.rawText, r.chatText, r.screenshotNotes)),
+    ),
+  );
 
   const recentBlocks = recentRecords
     .filter((r) => r.recordDate.toISOString().slice(0, 10) !== ymd)
@@ -71,7 +94,7 @@ async function loadDayContext(ymd: string) {
     return `- [${t.priority}] ${t.content}（来源 ${t.sourceDate.toISOString().slice(0, 10)}，截止 ${due}）`;
   });
 
-  return { records, recordBlocks, recentBlocks, openTodos, todoLines };
+  return { records, recordBlocks, parsedRecords, recentBlocks, openTodos, todoLines };
 }
 
 function fallbackPriorities(ymd: string, ctx: Awaited<ReturnType<typeof loadDayContext>>): BrokerPriorities {
@@ -119,47 +142,148 @@ function fallbackPriorities(ymd: string, ctx: Awaited<ReturnType<typeof loadDayC
   };
 }
 
+function dedupeProjects(projects: DailyRecordProject[]): DailyRecordProject[] {
+  const map = new Map<string, DailyRecordProject>();
+  for (const p of projects) {
+    const hit = map.get(p.name);
+    if (hit) {
+      for (const item of p.items) {
+        if (!hit.items.includes(item)) hit.items.push(item);
+      }
+    } else {
+      map.set(p.name, { name: p.name, items: [...p.items] });
+    }
+  }
+  return [...map.values()];
+}
+
+function mergeParsedRecords(parsedList: ParsedDailyRecord[]): ParsedDailyRecord {
+  const merged: ParsedDailyRecord = {
+    sections: { priorities: [], progress: [], risks: [], tomorrow: [], pending: [] },
+    projects: [],
+    lifeLines: [],
+  };
+  for (const p of parsedList) {
+    merged.sections.priorities.push(...p.sections.priorities);
+    merged.sections.progress.push(...p.sections.progress);
+    merged.sections.risks.push(...p.sections.risks);
+    merged.sections.tomorrow.push(...p.sections.tomorrow);
+    merged.sections.pending.push(...p.sections.pending);
+    merged.projects.push(...p.projects);
+    merged.lifeLines.push(...p.lifeLines);
+  }
+  merged.projects = dedupeProjects(merged.projects);
+  merged.lifeLines = [...new Set(merged.lifeLines)];
+  merged.sections.priorities = [...new Set(merged.sections.priorities)];
+  merged.sections.pending = [...new Set(merged.sections.pending)];
+  return merged;
+}
+
 function fallbackReviewMarkdown(ymd: string, ctx: Awaited<ReturnType<typeof loadDayContext>>): string {
   const lines: string[] = [];
-  lines.push(`## ${ymd} 日终复盘`);
+  const parsed = mergeParsedRecords(ctx.parsedRecords);
+  const hasContent =
+    parsed.sections.progress.length > 0 ||
+    parsed.projects.length > 0 ||
+    parsed.sections.pending.length > 0;
+
+  lines.push(REVIEW_HEADINGS.title(ymd));
   lines.push("");
-  lines.push("### 今天做了什么");
+  lines.push("> 笔调来自本地整理（模型未响应），事实仍取自你的日报。");
+  lines.push("");
+  lines.push(REVIEW_HEADINGS.slice);
   if (!ctx.records.length) {
-    lines.push("- （今日暂无记录，建议补记后再生成）");
+    lines.push("页面上还空着。随便写两三句，夜里复盘才有温度。");
+  } else if (parsed.projects.length) {
+    const vignettes = parsed.projects.map((proj) => {
+      if (!proj.items.length) return `${proj.name} 在今日露了面，细节还藏在标题里。`;
+      const acts = proj.items.slice(0, 4).join("、");
+      return `**${proj.name}** — ${acts}${proj.items.length > 4 ? "…" : ""}`;
+    });
+    lines.push(vignettes.join("\n\n"));
   } else {
-    for (const r of ctx.records) {
-      lines.push(`- ${r.analysisSummary || r.rawText.slice(0, 120)}`);
+    lines.push(parsed.sections.progress.slice(0, 8).map((x) => `- ${x}`).join("\n"));
+  }
+
+  lines.push("");
+  lines.push(REVIEW_HEADINGS.workbench);
+  const lights: string[] = [];
+  for (const proj of parsed.projects) {
+    if (proj.items.length) {
+      lights.push(`${proj.name} 往前走了 ${proj.items.length} 步，痕迹都留在记录里。`);
     }
   }
-  lines.push("");
-  lines.push("### 工作");
-  lines.push("- **亮点**：" + (ctx.records.length ? "已沉淀当日工作记录" : "待补充"));
-  lines.push("- **卡点**：待办未闭环项需关注");
-  lines.push("- **明天建议**：优先处理高优待办");
-  lines.push("");
-  lines.push("### 生活");
-  const lifeHint = ctx.recordBlocks.some((b) => /休息|运动|家庭|健康|睡眠/.test(b));
-  if (lifeHint) {
-    lines.push("- 记录中提到生活相关事项，注意节奏与恢复。");
-  } else {
-    lines.push("- 今日记录未提及生活话题；若今天较累，可适当安排休息。");
+  if (!lights.length && parsed.sections.progress.length) {
+    lights.push(`今日记下 ${parsed.sections.progress.length} 条线，像多张底片叠在同一天。`);
   }
+  lines.push("- **闪过的光**");
+  for (const x of (lights.length ? lights : ["材料尚薄，等你补几笔具体动作"]).slice(0, 4)) {
+    lines.push(`  - ${x}`);
+  }
+
+  const mists: string[] = [...parsed.sections.risks.filter((x) => !/^待补充$/i.test(x))];
+  if (!parsed.sections.tomorrow.length) {
+    mists.push("明日计划还是空白，夜里少了一盏指向明天的灯。");
+  }
+  if (parsed.sections.pending.length) {
+    mists.push(`${parsed.sections.pending.length} 件事仍停在「待确认」栏，像没收完的尾奏。`);
+  }
+  lines.push("- **未散的雾**");
+  for (const x of (mists.length ? mists : ["风险栏若也空着，不妨用一句话写下此刻最大的不确定"]).slice(0, 4)) {
+    lines.push(`  - ${x}`);
+  }
+
+  const lamps = [...parsed.sections.tomorrow, ...parsed.sections.pending.slice(0, 3)];
+  lines.push("- **明日的一盏灯**");
+  for (const x of (lamps.length ? lamps : ["先把待确认里最重要的一件收束，再写明日计划"]).slice(0, 4)) {
+    lines.push(`  - ${x}`);
+  }
+
   lines.push("");
-  lines.push("### 未完成待办");
-  if (!ctx.openTodos.length) {
-    lines.push("- （暂无）");
+  lines.push(REVIEW_HEADINGS.life);
+  if (parsed.lifeLines.length) {
+    lines.push(parsed.lifeLines.map((x) => x.replace(/^✅\s*/, "")).join("；") + "。");
+    lines.push("工作再满，也记得给独处留一点余温。");
+  } else if (hasContent) {
+    lines.push("今天几乎全是工作台的声音；明天若能留半小时给自己，会轻松很多。");
   } else {
+    lines.push("记录里没写到生活——若今天其实很累，也值得被看见。");
+  }
+
+  lines.push("");
+  lines.push(REVIEW_HEADINGS.pending);
+  const pendingFromRecord = parsed.sections.pending;
+  if (pendingFromRecord.length) {
+    for (const x of pendingFromRecord) {
+      lines.push(`- ${x}`);
+    }
+  }
+  if (ctx.openTodos.length) {
     for (const t of ctx.openTodos.slice(0, 8)) {
-      lines.push(`- [${t.priority}] ${t.content}`);
+      lines.push(`- ${t.content}`);
     }
   }
+  if (!pendingFromRecord.length && !ctx.openTodos.length) {
+    lines.push("- 暂无悬而未决；若心里有数，可写在日报「待确认事项」。");
+  }
+
   lines.push("");
-  lines.push("### 经纪人寄语");
-  lines.push(
-    ctx.records.length
-      ? "今天有记录就有复盘基础；明天先把最重要的一件事做完。"
-      : "空记录的一天很难帮你做决策；明天记得随手记。",
-  );
+  lines.push(REVIEW_HEADINGS.closing);
+  const topPending = parsed.sections.pending.at(-1) ?? parsed.sections.pending[0];
+  const topProject = parsed.projects[0]?.name;
+  if (topPending) {
+    lines.push(
+      `今天铺开的线头不少。明天不必全收，先把「${topPending.slice(0, 36)}」这一节拉直，其它的会跟上来。`,
+    );
+  } else if (topProject) {
+    lines.push(
+      `${topProject} 已有实感进展。睡前补两行明日计划，明天的你会少一分茫然。`,
+    );
+  } else if (ctx.records.length) {
+    lines.push("骨架已在。补全风险与明日计划后重新生成，可换一版更细的夜谈。");
+  } else {
+    lines.push("空白的一天很难替你点灯。明天随手记一两句就好。");
+  }
   return lines.join("\n");
 }
 
@@ -201,8 +325,9 @@ JSON 字段:
 
 要求:
 1) 只根据材料推断，不编造客户名/金额；
-2) 生活建议仅当记录或待办中出现休息/健康/家庭等线索；
-3) 中文简洁可执行。`;
+2) 若记录中有「工作优先级 / 当前工作打标 / P1-P5 / 重点事情」，优先对齐用户已声明的重点，再参考待办与今日进展；
+3) 生活建议仅当记录或待办中出现休息/健康/家庭等线索；
+4) 中文简洁可执行。`;
 
   const raw = await chat(
     [
@@ -213,7 +338,7 @@ JSON 字段:
       },
       { role: "user", content: prompt },
     ],
-    { temperature: 0.35, scenario: "broker_priorities", maxTokens: 1200 },
+    { temperature: 0.35, scenario: "broker_priorities", maxTokens: 1200, timeoutSec: 60 },
   );
 
   let data: BrokerPriorities;
@@ -258,6 +383,56 @@ JSON 字段:
   return { data, cached: false };
 }
 
+function emptyBrokerDailyReview(ymd: string): BrokerDailyReview {
+  return {
+    review_date: ymd,
+    generated_at: new Date().toISOString(),
+    source: "fallback",
+    markdown: "",
+  };
+}
+
+async function clearReviewMarkdown(ymd: string): Promise<void> {
+  const reviewDate = ymdToUtcMidnight(ymd);
+  const row = await prisma.dailyReview.findUnique({ where: { reviewDate } });
+  if (!row?.reviewMarkdown?.trim()) return;
+  await prisma.dailyReview.update({
+    where: { reviewDate },
+    data: { reviewMarkdown: "", updatedAt: new Date() },
+  });
+}
+
+/** 记录在复盘生成/更新后又变动时，缓存视为过期 */
+async function isDailyReviewStale(ymd: string, reviewUpdatedAt: Date): Promise<boolean> {
+  const dayStart = ymdToUtcMidnight(ymd);
+  const latestRecord = await prisma.dailyRecord.findFirst({
+    where: { recordDate: dayStart },
+    orderBy: { updatedAt: "desc" },
+    select: { updatedAt: true },
+  });
+  if (!latestRecord) return false;
+  return latestRecord.updatedAt.getTime() > reviewUpdatedAt.getTime();
+}
+
+async function readValidCachedReview(
+  ymd: string,
+  existing: { reviewMarkdown: string; updatedAt: Date },
+): Promise<BrokerDailyReview | null> {
+  const md = existing.reviewMarkdown.trim();
+  if (!md) return null;
+  if (!reviewMarkdownMatchesDate(md, ymd)) return null;
+  if (await isDailyReviewStale(ymd, existing.updatedAt)) return null;
+
+  const source: BrokerDailyReview["source"] =
+    md.includes("笔调来自本地整理") || md.includes("本地结构化复盘") ? "fallback" : "llm";
+  return {
+    review_date: ymd,
+    generated_at: existing.updatedAt.toISOString(),
+    source,
+    markdown: md,
+  };
+}
+
 export async function generateBrokerDailyReview(
   ymd: string,
   force = false,
@@ -266,45 +441,36 @@ export async function generateBrokerDailyReview(
     where: { reviewDate: ymdToUtcMidnight(ymd) },
   });
   if (existing?.reviewMarkdown?.trim() && !force) {
-    return {
-      data: {
-        review_date: ymd,
-        generated_at: existing.updatedAt.toISOString(),
-        source: "llm",
-        markdown: existing.reviewMarkdown,
-      },
-      cached: true,
-    };
+    const cached = await readValidCachedReview(ymd, existing);
+    if (cached) {
+      return { data: cached, cached: true };
+    }
+    await clearReviewMarkdown(ymd);
+    return { data: emptyBrokerDailyReview(ymd), cached: false };
+  }
+
+  if (!force) {
+    return { data: emptyBrokerDailyReview(ymd), cached: false };
   }
 
   const ctx = await loadDayContext(ymd);
-  const prompt = `你是用户的私人经纪人。请为 ${ymd} 写一份日终复盘（Markdown，不要 JSON）。
-
-今日记录:
-${ctx.recordBlocks.join("\n---\n") || "（今日无记录）"}
-
-未完成待办:
-${ctx.todoLines.join("\n") || "（无）"}
-
-结构必须包含以下二级标题（按顺序）:
-## ${ymd} 日终复盘
-### 今天做了什么
-### 工作（含亮点、卡点、明天工作建议，可用列表）
-### 生活（仅根据记录延伸；无生活线索则写一句温和提醒，勿编造具体事件）
-### 未完成待办
-### 经纪人寄语
-
-要求: 中文、具体、可执行；不编造未出现的客户/金额；每条列表不超过 8 项。`;
+  const prompt = buildBrokerReviewUserPrompt(
+    ymd,
+    ctx.recordBlocks.join("\n\n────\n\n") || "（今日无记录）",
+    ctx.todoLines.join("\n") || "（无）",
+  );
 
   const raw = await chat(
     [
-      {
-        role: "system",
-        content: "你是私人经纪人，擅长日终复盘与温和的生活工作平衡建议。",
-      },
+      { role: "system", content: BROKER_REVIEW_SYSTEM },
       { role: "user", content: prompt },
     ],
-    { temperature: 0.4, scenario: "broker_daily_review", maxTokens: 2000 },
+    {
+      temperature: 0.52,
+      scenario: "broker_daily_review",
+      maxTokens: 2800,
+      timeoutSec: 90,
+    },
   );
 
   const markdown = raw?.trim() ? raw.trim() : fallbackReviewMarkdown(ymd, ctx);

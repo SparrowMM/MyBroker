@@ -6,6 +6,7 @@ import { getJson } from "@/lib/api";
 import { daysAgoLocalYmd, todayLocalYmd } from "@/lib/local-date";
 import type { DailyRecordDto } from "@/app/records/_components/types";
 import type { BrokerDailyReview } from "@/lib/broker-types";
+import { ReviewPanel } from "@/app/_components/review-panel";
 
 type DayGroup = {
   date: string;
@@ -196,7 +197,7 @@ export default function HistoryPage() {
               ))}
             </ul>
             {expandedReview[g.date] ? (
-              <pre className="reviewMarkdown">{expandedReview[g.date]}</pre>
+              <ReviewPanel markdown={expandedReview[g.date]} exportDate={g.date} />
             ) : null}
             <div className="actions">
               <button
