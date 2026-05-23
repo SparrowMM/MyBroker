@@ -12,8 +12,9 @@ import {
   BROKER_REVIEW_SYSTEM,
   buildBrokerReviewUserPrompt,
   reviewMarkdownMatchesDate,
-  REVIEW_HEADINGS,
 } from "@/lib/broker-review-voice";
+import { buildFallbackReviewMarkdown } from "@/lib/broker-review-fallback";
+import { formatTeamTriggerHints, joinRecordMaterial } from "@/lib/broker-team";
 import { prisma } from "@/lib/prisma";
 import { decodeJsonList } from "@/lib/record-analyzer";
 import { ymdToUtcMidnight } from "@/lib/parse-ymd";
@@ -180,111 +181,9 @@ function mergeParsedRecords(parsedList: ParsedDailyRecord[]): ParsedDailyRecord 
 }
 
 function fallbackReviewMarkdown(ymd: string, ctx: Awaited<ReturnType<typeof loadDayContext>>): string {
-  const lines: string[] = [];
   const parsed = mergeParsedRecords(ctx.parsedRecords);
-  const hasContent =
-    parsed.sections.progress.length > 0 ||
-    parsed.projects.length > 0 ||
-    parsed.sections.pending.length > 0;
-
-  lines.push(REVIEW_HEADINGS.title(ymd));
-  lines.push("");
-  lines.push("> 笔调来自本地整理（模型未响应），事实仍取自你的日报。");
-  lines.push("");
-  lines.push(REVIEW_HEADINGS.slice);
-  if (!ctx.records.length) {
-    lines.push("页面上还空着。随便写两三句，夜里复盘才有温度。");
-  } else if (parsed.projects.length) {
-    const vignettes = parsed.projects.map((proj) => {
-      if (!proj.items.length) return `${proj.name} 在今日露了面，细节还藏在标题里。`;
-      const acts = proj.items.slice(0, 4).join("、");
-      return `**${proj.name}** — ${acts}${proj.items.length > 4 ? "…" : ""}`;
-    });
-    lines.push(vignettes.join("\n\n"));
-  } else {
-    lines.push(parsed.sections.progress.slice(0, 8).map((x) => `- ${x}`).join("\n"));
-  }
-
-  lines.push("");
-  lines.push(REVIEW_HEADINGS.workbench);
-  const lights: string[] = [];
-  for (const proj of parsed.projects) {
-    if (proj.items.length) {
-      lights.push(`${proj.name} 往前走了 ${proj.items.length} 步，痕迹都留在记录里。`);
-    }
-  }
-  if (!lights.length && parsed.sections.progress.length) {
-    lights.push(`今日记下 ${parsed.sections.progress.length} 条线，像多张底片叠在同一天。`);
-  }
-  lines.push("- **闪过的光**");
-  for (const x of (lights.length ? lights : ["材料尚薄，等你补几笔具体动作"]).slice(0, 4)) {
-    lines.push(`  - ${x}`);
-  }
-
-  const mists: string[] = [...parsed.sections.risks.filter((x) => !/^待补充$/i.test(x))];
-  if (!parsed.sections.tomorrow.length) {
-    mists.push("明日计划还是空白，夜里少了一盏指向明天的灯。");
-  }
-  if (parsed.sections.pending.length) {
-    mists.push(`${parsed.sections.pending.length} 件事仍停在「待确认」栏，像没收完的尾奏。`);
-  }
-  lines.push("- **未散的雾**");
-  for (const x of (mists.length ? mists : ["风险栏若也空着，不妨用一句话写下此刻最大的不确定"]).slice(0, 4)) {
-    lines.push(`  - ${x}`);
-  }
-
-  const lamps = [...parsed.sections.tomorrow, ...parsed.sections.pending.slice(0, 3)];
-  lines.push("- **明日的一盏灯**");
-  for (const x of (lamps.length ? lamps : ["先把待确认里最重要的一件收束，再写明日计划"]).slice(0, 4)) {
-    lines.push(`  - ${x}`);
-  }
-
-  lines.push("");
-  lines.push(REVIEW_HEADINGS.life);
-  if (parsed.lifeLines.length) {
-    lines.push(parsed.lifeLines.map((x) => x.replace(/^✅\s*/, "")).join("；") + "。");
-    lines.push("工作再满，也记得给独处留一点余温。");
-  } else if (hasContent) {
-    lines.push("今天几乎全是工作台的声音；明天若能留半小时给自己，会轻松很多。");
-  } else {
-    lines.push("记录里没写到生活——若今天其实很累，也值得被看见。");
-  }
-
-  lines.push("");
-  lines.push(REVIEW_HEADINGS.pending);
-  const pendingFromRecord = parsed.sections.pending;
-  if (pendingFromRecord.length) {
-    for (const x of pendingFromRecord) {
-      lines.push(`- ${x}`);
-    }
-  }
-  if (ctx.openTodos.length) {
-    for (const t of ctx.openTodos.slice(0, 8)) {
-      lines.push(`- ${t.content}`);
-    }
-  }
-  if (!pendingFromRecord.length && !ctx.openTodos.length) {
-    lines.push("- 暂无悬而未决；若心里有数，可写在日报「待确认事项」。");
-  }
-
-  lines.push("");
-  lines.push(REVIEW_HEADINGS.closing);
-  const topPending = parsed.sections.pending.at(-1) ?? parsed.sections.pending[0];
-  const topProject = parsed.projects[0]?.name;
-  if (topPending) {
-    lines.push(
-      `今天铺开的线头不少。明天不必全收，先把「${topPending.slice(0, 36)}」这一节拉直，其它的会跟上来。`,
-    );
-  } else if (topProject) {
-    lines.push(
-      `${topProject} 已有实感进展。睡前补两行明日计划，明天的你会少一分茫然。`,
-    );
-  } else if (ctx.records.length) {
-    lines.push("骨架已在。补全风险与明日计划后重新生成，可换一版更细的夜谈。");
-  } else {
-    lines.push("空白的一天很难替你点灯。明天随手记一两句就好。");
-  }
-  return lines.join("\n");
+  const material = joinRecordMaterial(ctx.recordBlocks, ctx.todoLines.join("\n"));
+  return buildFallbackReviewMarkdown(ymd, parsed, material, ctx);
 }
 
 export async function generateBrokerPriorities(
@@ -454,24 +353,31 @@ export async function generateBrokerDailyReview(
   }
 
   const ctx = await loadDayContext(ymd);
+  const recordBlocksJoined = ctx.recordBlocks.join("\n\n────\n\n") || "（今日无记录）";
+  const material = joinRecordMaterial(ctx.recordBlocks, ctx.todoLines.join("\n"));
   const prompt = buildBrokerReviewUserPrompt(
     ymd,
-    ctx.recordBlocks.join("\n\n────\n\n") || "（今日无记录）",
+    recordBlocksJoined,
     ctx.todoLines.join("\n") || "（无）",
+    formatTeamTriggerHints(material),
   );
 
-  const raw = await chat(
-    [
-      { role: "system", content: BROKER_REVIEW_SYSTEM },
-      { role: "user", content: prompt },
-    ],
-    {
-      temperature: 0.52,
-      scenario: "broker_daily_review",
-      maxTokens: 2800,
-      timeoutSec: 90,
-    },
+  const chatOpts = {
+    temperature: 0.52,
+    scenario: "broker_daily_review" as const,
+    maxTokens: 3200,
+    timeoutSec: 120,
+  };
+  let raw = await chat(
+    [{ role: "system", content: BROKER_REVIEW_SYSTEM }, { role: "user", content: prompt }],
+    chatOpts,
   );
+  if (!raw?.trim()) {
+    raw = await chat(
+      [{ role: "system", content: BROKER_REVIEW_SYSTEM }, { role: "user", content: prompt }],
+      { ...chatOpts, temperature: 0.45, scenario: "broker_daily_review_retry" },
+    );
+  }
 
   const markdown = raw?.trim() ? raw.trim() : fallbackReviewMarkdown(ymd, ctx);
   const data: BrokerDailyReview = {

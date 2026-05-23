@@ -13,6 +13,7 @@ describe("broker-review-voice", () => {
     expect(outline).toContain("收工片刻");
     expect(outline).toContain("今日切片");
     expect(outline).toContain("工作台手记");
+    expect(outline).toContain("团留言");
     expect(outline).not.toMatch(/^### 工作$/m);
   });
 
@@ -20,6 +21,7 @@ describe("broker-review-voice", () => {
     const p = buildBrokerReviewUserPrompt("2026-05-21", "记录", "待办");
     expect(p).toContain("散文");
     expect(p).toContain("闪过的光");
+    expect(p).toContain("职业教练");
     expect(BROKER_REVIEW_SYSTEM).toContain("闭环");
   });
 

@@ -20,6 +20,10 @@ const SAMPLE = `## 2026-05-21 · 收工片刻
 ### 仍悬而未决
 - □ 趋势洞察
 
+### 团留言
+- **职业教练**：明天先画流程图。
+- **复原顾问**：今晚早半小时收屏。
+
 ### 经纪人说
 早点休息。
 `;
@@ -32,6 +36,9 @@ describe("parseReviewDocument", () => {
       "评审完成",
     ]);
     expect(doc.sections.find((s) => s.kind === "pending")?.bullets[0]).toContain("趋势洞察");
+    const team = doc.sections.find((s) => s.kind === "team");
+    expect(team?.teamMessages).toHaveLength(2);
+    expect(team?.teamMessages?.[0].role).toBe("职业教练");
   });
 
   it("兼容旧版标题", () => {

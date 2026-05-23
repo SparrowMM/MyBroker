@@ -66,6 +66,20 @@ describe("parseDailyRecordMarkdown", () => {
     expect(parsed.projects.some((p) => /AE 农场/.test(p.name))).toBe(true);
   });
 
+  it("饮食与生活内容不进工作项目分组", () => {
+    const parsed = parseDailyRecordMarkdown(`# 日报
+## 今日进展
+- ✅ 吃水煮牛肉
+  - 约会见面
+- ✅ AE 农场 30min
+  - 松鼠换肤
+- 孩子哭闹 2小时
+`);
+    expect(parsed.projects.some((p) => /水煮牛肉/.test(p.name))).toBe(false);
+    expect(parsed.projects.some((p) => /农场/.test(p.name))).toBe(true);
+    expect(parsed.lifeLines.some((x) => /水煮牛肉|哭闹/.test(x))).toBe(true);
+  });
+
   it("formatParsedRecordForBroker 输出优先级且不填充待补充", () => {
     const parsed = parseDailyRecordMarkdown(SAMPLE_WITH_PRIORITIES);
     const block = formatParsedRecordForBroker(parsed, []);

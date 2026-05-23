@@ -30,7 +30,10 @@ const SECTION_KEYS: { key: keyof DailyRecordSections; patterns: RegExp[] }[] = [
   { key: "pending", patterns: [/待确认/, /待办/, /待处理/] },
 ];
 
-const LIFE_HINT = /吃饭|用餐|休息|运动|健身|睡眠|家庭|散步|独处|生活|放松/;
+/** 生活/家庭/饮食/情绪等，不计入工作项目分组 */
+export const LIFE_CONTENT_RE =
+  /吃饭|用餐|休息|运动|健身|睡眠|家庭|散步|独处|生活|放松|水煮|牛肉|泡面|见面|约会|学弟|看盘|游戏|闲聊|孩子|带娃|哭闹|育儿|教育|无助|母亲|宝宝|哄睡|情绪安抚/;
+
 const TIME_SLOT_RE = /^(上午|中午|下午|晚上)[：:]/;
 
 /** 去掉粘贴重复导致的第二份同款日报 */
@@ -44,20 +47,47 @@ export function dedupeDailyReportText(text: string): string {
   return trimmed;
 }
 
-function isLifeProgressLine(text: string): boolean {
+export function isLifeContent(text: string): boolean {
   const clean = stripDecorators(text);
-  return LIFE_HINT.test(clean) || TIME_SLOT_RE.test(clean) && LIFE_HINT.test(clean);
+  return LIFE_CONTENT_RE.test(clean);
+}
+
+/** 是否作为工作向的项目块展示 */
+export function isWorkProjectName(name: string): boolean {
+  const clean = stripDecorators(name).replace(/\*\*/g, "").trim();
+  if (!clean || isLifeContent(clean)) return false;
+  if (/^(吃|喝)/.test(clean)) return false;
+  if (/^\d{1,2}[：:]\d{2}\s*开始\s*$/.test(clean)) return false;
+  if (/^(上午|下午|晚上|中午)工作[：:]\s*\d{1,2}[：:]\d{2}开始\s*$/.test(clean)) return false;
+  return /农场|社媒|矩阵|项目|Agent|Master|换肤|动效|评审|周会|Deep Research|需求|TC|办公|工作|互动/.test(
+    clean,
+  );
+}
+
+function isLifeProgressLine(text: string): boolean {
+  return isLifeContent(text);
 }
 
 function isProjectHeader(indent: number, content: string): boolean {
   if (indent > 2) return false;
   const clean = stripDecorators(content);
-  if (TIME_SLOT_RE.test(clean) && LIFE_HINT.test(clean)) return false;
-  if (TIME_SLOT_RE.test(clean) && /项目|农场|互动|周会/.test(clean)) return true;
-  if (/农场|项目|互动/.test(clean)) return true;
-  if (/✅/.test(clean) && indent <= 2) return true;
-  if (/周会$/.test(clean) && clean.length <= 10 && indent === 0) return true;
+  if (isLifeContent(clean)) return false;
+  if (TIME_SLOT_RE.test(clean) && /项目|农场|互动|周会|社媒|矩阵/.test(clean)) return true;
+  if (/农场|社媒|矩阵|Agent|Master|换肤|动效|Deep Research/.test(clean)) return true;
+  if (/✅/.test(clean) && indent <= 2 && isWorkProjectName(clean)) return true;
+  if (/周会$/.test(clean) && clean.length <= 12 && indent === 0) return true;
   return false;
+}
+
+function inferProjectName(line: string): string {
+  const clean = stripDecorators(line);
+  const m = clean.match(/(AE\s*农场|社媒[^，,\s]*|矩阵|Deep Research[^，,\s]*)/i);
+  if (m) return m[1].trim();
+  if (TIME_SLOT_RE.test(clean)) {
+    const core = clean.replace(TIME_SLOT_RE, "").trim();
+    if (core) return core.slice(0, 32);
+  }
+  return clean.slice(0, 28);
 }
 
 /** 待确认列表只保留最深层路径，避免父节点重复 */
@@ -177,13 +207,20 @@ function groupProgressProjects(progressLines: string[]): DailyRecordProject[] {
 
     if (current) {
       current.items.push(clean);
-    } else {
-      current = { name: clean, items: [] };
-      projects.push(current);
+    } else if (!isLifeContent(clean)) {
+      const name = inferProjectName(clean);
+      const hit = projects.find((p) => p.name === name);
+      if (hit) {
+        hit.items.push(clean);
+        current = hit;
+      } else {
+        current = { name, items: [clean] };
+        projects.push(current);
+      }
     }
   }
 
-  return projects.filter((p) => p.name || p.items.length);
+  return projects.filter((p) => isWorkProjectName(p.name) || p.items.some((i) => !isLifeContent(i)));
 }
 
 export function parseDailyRecordMarkdown(text: string): ParsedDailyRecord {
@@ -198,7 +235,7 @@ export function parseDailyRecordMarkdown(text: string): ParsedDailyRecord {
   };
 
   const projects = groupProgressProjects(progressRaw);
-  const lifeLines = sections.progress.filter((line) => LIFE_HINT.test(line));
+  const lifeLines = sections.progress.filter((line) => isLifeContent(line));
 
   return { sections, projects, lifeLines };
 }

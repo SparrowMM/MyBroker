@@ -37,6 +37,8 @@ function sectionIcon(kind: ParsedReviewSection["kind"]): string {
       return "○";
     case "pending":
       return "□";
+    case "team":
+      return "◎";
     case "closing":
       return "✦";
     default:
@@ -46,6 +48,27 @@ function sectionIcon(kind: ParsedReviewSection["kind"]): string {
 
 function hasWorkbenchContent(wb: WorkbenchLanes): boolean {
   return wb.light.length + wb.fog.length + wb.lamp.length > 0;
+}
+
+function TeamCards({ section }: { section: ParsedReviewSection }) {
+  const items = section.teamMessages ?? [];
+  if (!items.length) {
+    return (
+      <p className="reviewCardPara reviewTeamEmpty">
+        {section.paragraphs[0] ?? "（今日顾问未出镜）"}
+      </p>
+    );
+  }
+  return (
+    <ul className="reviewTeamList">
+      {items.map((msg, i) => (
+        <li key={i} className="reviewTeamItem">
+          <span className="reviewTeamRole">{msg.role}</span>
+          <span className="reviewTeamText" dangerouslySetInnerHTML={{ __html: inlineMd(msg.text) }} />
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function WorkbenchCards({ section }: { section: ParsedReviewSection }) {
@@ -86,9 +109,11 @@ function SectionCard({ section }: { section: ParsedReviewSection }) {
         <h4 className="reviewSectionTitle">{section.title}</h4>
       </header>
       <div className="reviewSectionBody">
-        {section.kind === "workbench" &&
-        section.workbench &&
-        hasWorkbenchContent(section.workbench) ? (
+        {section.kind === "team" ? (
+          <TeamCards section={section} />
+        ) : section.kind === "workbench" &&
+          section.workbench &&
+          hasWorkbenchContent(section.workbench) ? (
           <WorkbenchCards section={section} />
         ) : (
           <>

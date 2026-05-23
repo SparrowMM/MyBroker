@@ -6,14 +6,20 @@ export type WorkbenchLanes = {
   lamp: string[];
 };
 
+export type TeamMessageParsed = {
+  role: string;
+  text: string;
+};
+
 export type ParsedReviewSection = {
   key: string;
   title: string;
-  kind: "slice" | "workbench" | "life" | "pending" | "closing" | "other";
+  kind: "slice" | "workbench" | "life" | "pending" | "team" | "closing" | "other";
   body: string;
   paragraphs: string[];
   bullets: string[];
   workbench?: WorkbenchLanes;
+  teamMessages?: TeamMessageParsed[];
 };
 
 export type ParsedReview = {
@@ -28,8 +34,11 @@ const SECTION_KIND: { match: RegExp; kind: ParsedReviewSection["kind"]; title: s
   { match: /工作台手记|^工作$/, kind: "workbench", title: "工作台手记" },
   { match: /生活隙|^生活$/, kind: "life", title: "生活隙" },
   { match: /仍悬而未决|未完成待办/, kind: "pending", title: "仍悬而未决" },
+  { match: /团留言|顾问留言/, kind: "team", title: "团留言" },
   { match: /经纪人说|经纪人寄语/, kind: "closing", title: "经纪人说" },
 ];
+
+const TEAM_ROLE_RE = /^\*\*(职业教练|复原顾问|育儿同伴)\*\*[：:]\s*(.+)$/;
 
 const WORKBENCH_LABELS: { re: RegExp; lane: keyof WorkbenchLanes; label: string }[] = [
   { re: /闪过的光|亮点/, lane: "light", label: "闪过的光" },
@@ -109,6 +118,24 @@ function parseWorkbench(body: string): WorkbenchLanes {
   return lanes;
 }
 
+function parseTeamMessages(body: string): TeamMessageParsed[] {
+  const messages: TeamMessageParsed[] = [];
+  for (const raw of body.split(/\n/)) {
+    const t = raw.trim();
+    if (!t) continue;
+    const bullet = t.replace(/^[-*•]\s+/, "");
+    const m = bullet.match(TEAM_ROLE_RE);
+    if (m) {
+      messages.push({ role: m[1], text: m[2].trim() });
+      continue;
+    }
+    if (!messages.length && !/^[-*•]/.test(t) && t.length > 4) {
+      messages.push({ role: "团", text: t });
+    }
+  }
+  return messages;
+}
+
 export function parseReviewDocument(md: string): ParsedReview {
   const raw = md.trim();
   let docTitle = "日终复盘";
@@ -161,6 +188,9 @@ export function parseReviewDocument(md: string): ParsedReview {
     };
     if (kind === "workbench") {
       sec.workbench = parseWorkbench(body);
+    }
+    if (kind === "team") {
+      sec.teamMessages = parseTeamMessages(body);
     }
     return sec;
   });
