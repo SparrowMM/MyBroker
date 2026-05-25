@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",
-    "@supabase/supabase-js": "^2.103.0",
+    "@supabase/supabase-js": "^2.106.1",
     "html-to-image": "^1.11.13",
     "next": "^16.2.4",
     "prisma": "^6.0.0",
