@@ -1,0 +1,36 @@
+# 在非 Vercel Cron 场景下，可用 GitHub Actions 按计划触发线上「定时每日推送」。
+# 仓库 Settings → Secrets → Actions 中配置：
+#   APP_BASE_URL    例如 https://your-deployment.vercel.app（勿尾部斜杠）
+#   CRON_SECRET     须与部署环境中的 CRON_SECRET 完全一致
+#
+# 线上仍需开启：AUTO_PUSH_DAILY_ENABLED=true，并配置 WEBHOOK_* 与 AUTO_PUSH_DAILY_CHANNEL。
+
+name: Daily notify (cron)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # UTC 每日 01:00（约北京时间 09:00）；可按需修改
+    - cron: "0 1 * * *"
+
+concurrency:
+  group: daily-notify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Trigger /api/cron/push-daily
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_BASE_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "Configure APP_BASE_URL and CRON_SECRET in repository Actions secrets." >&2
+            exit 1
+          fi
+          BASE="${APP_BASE_URL%/}"
+          curl -fsS -H "Authorization: Bearer ${CRON_SECRET}" "${BASE}/api/cron/push-daily"
