@@ -3,8 +3,10 @@ import {
   analyzeDayMetrics,
   buildFallbackTeamMessages,
   formatTeamTriggerHints,
+  hasParentingSignals,
   parseSleepFromText,
   parseTimeUsageFromText,
+  selectRestDayTeamMembers,
   selectTeamMembers,
   workTimeEntries,
 } from "./broker-team";
@@ -70,5 +72,57 @@ AE 农场 45min
     const msgs = buildFallbackTeamMessages("社媒对焦 60min\n方案写完 30min", parsed);
     const career = msgs.find((m) => m.id === "career");
     expect(career?.text).toMatch(/对焦|产出|分钟|小时/);
+  });
+
+  it("休息日选出生活/健身/休息教练", () => {
+    const text = `陪家人 3 小时\n打扫卫生\n背部训练 + 跑步\n晚上游戏放松`;
+    const ids = selectTeamMembers(text, 3, { restDay: true });
+    expect(ids).toContain("life");
+    expect(ids).toContain("fitness");
+    expect(ids).toContain("rest");
+    expect(ids).not.toContain("career");
+  });
+
+  it("休息日触发提示含三位教练摘录", () => {
+    const hints = formatTeamTriggerHints("陪家人\n跑步 40min\n晚上游戏", { restDay: true });
+    expect(hints).toContain("生活教练");
+    expect(hints).toContain("健身教练");
+    expect(hints).toContain("休息教练");
+    expect(hints).toContain("生活摘录");
+    expect(hints).not.toMatch(/职业教练：建议出镜/);
+  });
+
+  it("休息日有育儿记录时保留育儿同伴专席", () => {
+    const text = "陪家人 3 小时\n孩子闹脾气 1 小时\n背部训练 + 跑步\n晚上游戏";
+    const ids = selectTeamMembers(text, 4, { restDay: true });
+    expect(ids).toContain("parenting");
+    expect(ids).toContain("life");
+    expect(ids).toContain("fitness");
+    expect(ids).toContain("rest");
+    expect(ids.length).toBe(4);
+  });
+
+  it("陪孩子等表述可触发育儿同伴", () => {
+    expect(hasParentingSignals("下午陪孩子搭积木")).toBe(true);
+    const ids = selectRestDayTeamMembers("下午陪孩子搭积木\n跑步");
+    expect(ids).toContain("parenting");
+  });
+
+  it("休息日触发提示含育儿摘录时标记必须出镜", () => {
+    const hints = formatTeamTriggerHints("陪孩子 2 小时\n跑步 40min\n晚上游戏", { restDay: true });
+    expect(hints).toContain("育儿同伴：必须出镜");
+    expect(hints).toContain("育儿摘录");
+  });
+
+  it("休息日本地回退含育儿同伴", () => {
+    const parsed = parseDailyRecordMarkdown(`# 生活记录
+## 今日进展
+- 陪孩子 2 小时
+- 跑步 30min
+- 晚上游戏`);
+    const msgs = buildFallbackTeamMessages("陪孩子 2 小时\n跑步 30min\n晚上游戏", parsed, {
+      restDay: true,
+    });
+    expect(msgs.some((m) => m.label === "育儿同伴")).toBe(true);
   });
 });

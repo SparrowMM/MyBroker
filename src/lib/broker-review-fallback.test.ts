@@ -31,4 +31,27 @@ describe("broker-review-fallback", () => {
     expect(md).toMatch(/生活隙|水煮牛肉|哭闹/);
     expect(md).toContain("AE");
   });
+
+  it("休息日本地回退不含工作待办", () => {
+    const text = `# 2026-06-01 生活记录
+## 今日进展
+- 陪家人 3 小时
+- 打扫卫生
+- 跑步放松
+- 晚上游戏`;
+    const parsed = parseDailyRecordMarkdown(text);
+    const md = buildFallbackReviewMarkdown("2026-06-01", parsed, text, {
+      records: [{ length: 1 }],
+      recordBlocks: [text],
+      todoLines: ["- [high] AE 农场对接（来源 2026-05-30，截止 无）"],
+      openTodos: [{ content: "AE 农场对接" }],
+      parsedRecords: [parsed],
+    }, "rest");
+    expect(md).toContain("收工时刻");
+    expect(md).toContain("生活手记");
+    expect(md).not.toContain("AE 农场");
+    expect(md).not.toContain("仍悬而未决");
+    expect(md).not.toContain("职业教练");
+    expect(md).toMatch(/生活教练|健身教练|休息教练/);
+  });
 });

@@ -2,7 +2,9 @@
 
 import type { ParsedDailyRecord } from "@/lib/daily-record-structure";
 
-export type TeamMemberId = "career" | "recovery" | "parenting";
+export type WorkTeamMemberId = "career" | "recovery" | "parenting";
+export type RestTeamMemberId = "life" | "fitness" | "rest";
+export type TeamMemberId = WorkTeamMemberId | RestTeamMemberId;
 
 export type TeamMemberDef = {
   id: TeamMemberId;
@@ -32,7 +34,39 @@ export const TEAM_MEMBERS: TeamMemberDef[] = [
   {
     id: "parenting",
     label: "育儿同伴",
-    patterns: [/孩子|带娃|哭闹|育儿|母亲|宝宝|幼儿|幼儿园|哄睡/],
+    patterns: [
+      /孩子|育儿|带娃|亲子|陪娃|宝宝|幼儿|儿子|女儿|小孩|哄睡|喂奶|幼儿园|辅食/,
+      /母婴|奶爸|宝妈|哭闹|陪孩子|陪儿子|陪女儿|遛娃|接放学|辅导作业|讲故事/,
+      /教育孩子|育儿|换尿布|夜醒|辅食|亲子阅读/,
+    ],
+  },
+];
+
+/** 休息日专属顾问（禁止职业教练） */
+export const REST_TEAM_MEMBERS: TeamMemberDef[] = [
+  {
+    id: "life",
+    label: "生活教练",
+    patterns: [
+      /家庭|家人|陪伴|打扫|清洁|卫生|整理|做饭|吃饭|用餐|散步/,
+      /见面|约会|社交|闲聊|生活|买菜|洗衣|家务|陪玩/,
+    ],
+  },
+  {
+    id: "fitness",
+    label: "健身教练",
+    patterns: [
+      /运动|健身|跑步|训练|瑜伽|游泳|骑行|锻炼|拉伸|力量|有氧/,
+      /背部|腿部|核心|举重|徒步|登山|球类|羽毛球|篮球/,
+    ],
+  },
+  {
+    id: "rest",
+    label: "休息教练",
+    patterns: [
+      /休息|放松|睡眠|入睡|起床|收屏|独处|放空|冥想|午睡|小憩/,
+      /游戏|刷手机|视频|追剧|影视|熬夜|疲惫|很累|累/,
+    ],
   },
 ];
 
@@ -63,7 +97,11 @@ export type TeamMessage = {
   text: string;
 };
 
-export type TeamSignalScores = Record<TeamMemberId, number>;
+export type TeamSignalScores = Record<WorkTeamMemberId, number>;
+export type RestTeamSignalScores = Record<RestTeamMemberId, number>;
+
+const FITNESS_TIME_HINT =
+  /跑步|运动|健身|训练|瑜伽|游泳|骑行|锻炼|拉伸|力量|有氧|背部|腿部|核心|徒步|登山/;
 
 const TIME_ON_LINE =
   /(\d+(?:\.\d+)?)\s*(?:h|小时|hr)(?:\s*(\d+)\s*(?:m|分|分钟))?|(\d+)\s*(?:min|minutes?|m|分钟|分)(?:钟)?|(\d+(?:\.\d+)?)h\b|(\d+)min\b|用时[：:\s]*(\d+)\s*(?:分钟|分)?/gi;
@@ -93,6 +131,14 @@ export function isWorkTimeEntry(entry: TimeUsageEntry): boolean {
 
 export function workTimeEntries(entries: TimeUsageEntry[]): TimeUsageEntry[] {
   return entries.filter(isWorkTimeEntry);
+}
+
+export function fitnessTimeEntries(entries: TimeUsageEntry[]): TimeUsageEntry[] {
+  return entries.filter(
+    (e) =>
+      !isWorkTimeEntry(e) &&
+      (FITNESS_TIME_HINT.test(e.label) || FITNESS_TIME_HINT.test(e.raw)),
+  );
 }
 
 export function formatMinutes(m: number): string {
@@ -238,11 +284,80 @@ export function scoreTeamSignals(text: string): TeamSignalScores {
   return { career, recovery, parenting };
 }
 
+export function scoreRestTeamSignals(text: string): RestTeamSignalScores {
+  const t = text.trim();
+  const metrics = analyzeDayMetrics(t);
+  const life = scoreMember(t, REST_TEAM_MEMBERS[0]);
+  let fitness = scoreMember(t, REST_TEAM_MEMBERS[1]);
+  let rest = scoreMember(t, REST_TEAM_MEMBERS[2]);
+
+  const fitnessTimes = fitnessTimeEntries(metrics.timeEntries);
+  if (fitnessTimes.length >= 1) fitness += 2 + Math.min(fitnessTimes.length, 3);
+  if (fitnessTimes.reduce((s, e) => s + e.minutes, 0) >= 30) fitness += 1;
+  if (sleepHasData(metrics.sleep)) rest += 3;
+  if (/凌晨|熬夜|失眠|游戏|刷手机|视频|追剧/.test(t)) rest += 2;
+  if (/家庭|家人|陪伴|打扫|清洁/.test(t)) {
+    // 生活教练与休息教练信号可能重叠，生活教练略加权
+  }
+
+  return { life, fitness, rest };
+}
+
+/** 休息日：从生活/健身/休息教练中选出最多 max 位（有信号者出镜） */
+export function selectRestTeamMembers(text: string, max = 3): RestTeamMemberId[] {
+  const scores = scoreRestTeamSignals(text);
+  const ranked = (Object.keys(scores) as RestTeamMemberId[])
+    .map((id) => ({ id, score: scores[id] }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (!ranked.length) {
+    return text.trim().length > 20 ? ["rest"] : [];
+  }
+
+  const picked = ranked.slice(0, max).map((x) => x.id);
+
+  // 有健身记录时确保健身教练有机会出镜
+  if (/运动|健身|跑步|训练/.test(text) && !picked.includes("fitness") && picked.length < max) {
+    picked.push("fitness");
+  }
+  // 有家人/家务时确保生活教练有机会出镜
+  if (/家庭|家人|陪伴|打扫|清洁|生活/.test(text) && !picked.includes("life") && picked.length < max) {
+    picked.push("life");
+  }
+
+  return picked.slice(0, max);
+}
+
+/** 材料中是否含育儿向记录 */
+export function hasParentingSignals(text: string): boolean {
+  return scoreMember(text.trim(), TEAM_MEMBERS[2]) > 0;
+}
+
+/** 休息日顾问：三位生活向教练 + 有育儿信号时保证育儿同伴专席（最多 4 位） */
+export function selectRestDayTeamMembers(text: string): TeamMemberId[] {
+  const parentingOn = hasParentingSignals(text);
+  const restIds = selectRestTeamMembers(text, 3);
+  if (parentingOn) {
+    return [...restIds, "parenting"];
+  }
+  return restIds;
+}
+
 /** 从材料中选出最多 max 位顾问（复原顾问与育儿同伴同日不并存） */
-export function selectTeamMembers(text: string, max = 2): TeamMemberId[] {
+export function selectTeamMembers(
+  text: string,
+  max = 2,
+  options?: { restDay?: boolean },
+): TeamMemberId[] {
+  const restDay = options?.restDay ?? false;
+  if (restDay) {
+    return selectRestDayTeamMembers(text);
+  }
+
   const scores = scoreTeamSignals(text);
   const metrics = analyzeDayMetrics(text);
-  const ranked = (Object.keys(scores) as TeamMemberId[])
+  const ranked = (Object.keys(scores) as WorkTeamMemberId[])
     .map((id) => ({ id, score: scores[id] }))
     .filter((x) => x.score > 0)
     .sort((a, b) => b.score - a.score);
@@ -251,7 +366,7 @@ export function selectTeamMembers(text: string, max = 2): TeamMemberId[] {
     return text.trim().length > 80 ? ["career"] : [];
   }
 
-  const picked: TeamMemberId[] = [];
+  const picked: WorkTeamMemberId[] = [];
   for (const { id } of ranked) {
     if (picked.length >= max) break;
     if (id === "recovery" && picked.includes("parenting")) continue;
@@ -276,7 +391,7 @@ export function selectTeamMembers(text: string, max = 2): TeamMemberId[] {
 }
 
 export function teamMemberById(id: TeamMemberId): TeamMemberDef {
-  const m = TEAM_MEMBERS.find((x) => x.id === id);
+  const m = [...TEAM_MEMBERS, ...REST_TEAM_MEMBERS].find((x) => x.id === id);
   if (!m) throw new Error(`unknown team member: ${id}`);
   return m;
 }
@@ -312,10 +427,114 @@ function formatSleepExcerpt(sleep: SleepSnapshot): string {
   return `- 睡眠摘录（用户重视睡眠，复原顾问须据此给一条睡眠窗或收屏建议）：${parts.join("；")}`;
 }
 
+function formatRestLifeExcerpt(text: string): string {
+  const snippets: string[] = [];
+  for (const raw of text.split(/\n/)) {
+    const line = raw.trim().replace(/^[-*•✅□\s]+/, "");
+    if (/家庭|家人|陪伴|打扫|清洁|生活|见面|约会/.test(line) && line.length < 80) {
+      snippets.push(line.slice(0, 60));
+    }
+  }
+  if (!snippets.length) {
+    return "- 生活摘录：（暂无；生活教练可温柔提醒记录家人/家务/陪伴片段）";
+  }
+  return `- 生活摘录（生活教练须引用）：${[...new Set(snippets)].slice(0, 4).join("；")}`;
+}
+
+function formatFitnessExcerpt(text: string, metrics: DayMetrics): string {
+  const fitnessTimes = fitnessTimeEntries(metrics.timeEntries);
+  if (fitnessTimes.length) {
+    const lines = fitnessTimes.slice(0, 4).map((e) => `${e.label || "运动"} ${formatMinutes(e.minutes)}`);
+    return `- 运动摘录（健身教练须引用）：${lines.join("、")}`;
+  }
+  const snippets: string[] = [];
+  for (const raw of text.split(/\n/)) {
+    const line = raw.trim().replace(/^[-*•✅□\s]+/, "");
+    if (/运动|健身|跑步|训练|瑜伽|游泳|骑行|锻炼|背部/.test(line) && line.length < 80) {
+      snippets.push(line.slice(0, 60));
+    }
+  }
+  if (!snippets.length) {
+    return "- 运动摘录：（暂无；有运动记录时健身教练须给恢复/节奏建议）";
+  }
+  return `- 运动摘录（健身教练须引用）：${[...new Set(snippets)].slice(0, 3).join("；")}`;
+}
+
+function formatRestRecoveryExcerpt(sleep: SleepSnapshot, text: string): string {
+  const sleepLine = formatSleepExcerpt(sleep).replace("复原顾问", "休息教练");
+  if (sleepHasData(sleep)) return sleepLine;
+  const snippets: string[] = [];
+  for (const raw of text.split(/\n/)) {
+    const line = raw.trim().replace(/^[-*•✅□\s]+/, "");
+    if (/休息|放松|游戏|刷手机|视频|收屏|独处|放空/.test(line) && line.length < 80) {
+      snippets.push(line.slice(0, 60));
+    }
+  }
+  if (snippets.length) {
+    return `- 休息摘录（休息教练须引用）：${[...new Set(snippets)].slice(0, 3).join("；")}`;
+  }
+  return "- 休息摘录：（暂无；休息教练可给收屏/睡眠窗/放空建议）";
+}
+
+function formatParentingExcerpt(text: string): string {
+  const snippets: string[] = [];
+  for (const raw of text.split(/\n/)) {
+    const line = raw.trim().replace(/^[-*•✅□\s]+/, "");
+    if (hasParentingSignals(line) && line.length < 100) {
+      snippets.push(line.slice(0, 70));
+    }
+  }
+  if (!snippets.length && hasParentingSignals(text)) {
+    const m = text.match(
+      /.{0,20}(?:孩子|娃|育儿|带娃|亲子|宝宝|幼儿|儿子|女儿|小孩|哄睡|陪孩子).{0,40}/,
+    );
+    if (m) snippets.push(m[0].trim());
+  }
+  if (!snippets.length) {
+    return "- 育儿摘录：（暂无）";
+  }
+  return `- 育儿摘录（育儿同伴须引用，有则必须出镜）：${[...new Set(snippets)].slice(0, 3).join("；")}`;
+}
+
 /** 写入 LLM 用户 prompt 的触发提示 */
-export function formatTeamTriggerHints(text: string): string {
+export function formatTeamTriggerHints(text: string, options?: { restDay?: boolean }): string {
+  const restDay = options?.restDay ?? false;
+  if (restDay) {
+    const scores = scoreRestTeamSignals(text);
+    const selected = selectRestDayTeamMembers(text);
+    const metrics = analyzeDayMetrics(text);
+    const parentingOn = hasParentingSignals(text);
+    const lines: string[] = [
+      "【顾问触发（休息日：生活/健身/休息教练；有育儿记录时育儿同伴必须出镜）】",
+      "【用户侧重】生活节律、运动恢复、睡眠与收屏、育儿陪伴",
+    ];
+    for (const m of REST_TEAM_MEMBERS) {
+      const on = selected.includes(m.id);
+      const score = scores[m.id];
+      let extra = "";
+      if (m.id === "life" && on) extra = " → 引用生活摘录，点出陪伴/家务/生活节奏";
+      if (m.id === "fitness" && on) extra = " → 引用运动摘录，给恢复或明日节奏建议（勿加量施压）";
+      if (m.id === "rest" && on) {
+        extra = sleepHasData(metrics.sleep)
+          ? " → 引用睡眠/休息摘录，给收屏或睡眠窗一条"
+          : " → 根据放松/屏幕/收屏线索给一条休息建议";
+      }
+      lines.push(`- ${m.label}：${on ? "建议出镜" : "不出镜"}（信号 ${score}）${extra}`);
+    }
+    if (parentingOn) {
+      lines.push("- 育儿同伴：必须出镜（有育儿信号）→ 引用育儿摘录，同伴口吻，不讲理论课");
+    }
+    const labels = selected.map((id) => teamMemberById(id).label);
+    lines.push(`- 今日出镜 ${labels.length} 位：${labels.join("、") || "无"}`);
+    lines.push(formatRestLifeExcerpt(text));
+    lines.push(formatFitnessExcerpt(text, metrics));
+    lines.push(formatRestRecoveryExcerpt(metrics.sleep, text));
+    if (parentingOn) lines.push(formatParentingExcerpt(text));
+    return lines.join("\n");
+  }
+
   const scores = scoreTeamSignals(text);
-  const selected = selectTeamMembers(text);
+  const selected = selectTeamMembers(text, 2, { restDay: false });
   const metrics = analyzeDayMetrics(text);
   const lines: string[] = [
     "【顾问触发（团留言参考，勿编造未出现的事实）】",
@@ -379,18 +598,72 @@ function splitFocusOutput(entries: TimeUsageEntry[]): {
 export function buildFallbackTeamMessages(
   materialText: string,
   parsed: ParsedDailyRecord,
+  options?: { restDay?: boolean },
 ): TeamMessage[] {
-  const ids = selectTeamMembers(materialText);
+  const restDay = options?.restDay ?? false;
+  const ids = selectTeamMembers(materialText, restDay ? 4 : 2, { restDay });
   const metrics = analyzeDayMetrics(materialText);
   const msgs: TeamMessage[] = [];
   const pending = parsed.sections.pending[0]?.slice(0, 40);
   const tomorrow = parsed.sections.tomorrow[0]?.slice(0, 40);
   const workTimes = workTimeEntries(metrics.timeEntries);
+  const fitnessTimes = fitnessTimeEntries(metrics.timeEntries);
   const { focusMin, outputMin, topFocus, topOutput } = splitFocusOutput(workTimes);
 
   for (const id of ids) {
     const { label } = teamMemberById(id);
-    if (id === "career") {
+    if (id === "life") {
+      const anchor =
+        parsed.lifeLines[0]?.slice(0, 36) ||
+        (materialText.match(/家庭|家人|陪伴|打扫|清洁|生活[^\\n]{0,24}/)?.[0] ?? "今天的生活片段");
+      msgs.push({
+        id,
+        label,
+        text: `「${anchor.replace(/^[-*•✅□\s]+/, "").slice(0, 28)}」值得被写进正文。明天留一段无目的的陪伴或家务时间，不必填满。`,
+      });
+    } else if (id === "fitness") {
+      if (fitnessTimes.length) {
+        const top = fitnessTimes[0];
+        msgs.push({
+          id,
+          label,
+          text: `${top.label.slice(0, 24)} ${formatMinutes(top.minutes)} 已进账。明天同样节奏或少 10 分钟就够，休息日的运动是为了恢复，不是 KPI。`,
+        });
+      } else {
+        msgs.push({
+          id,
+          label,
+          text: "有动就比没有好。若明天还想练，先定 20 分钟低强度，比临时加量更可持续。",
+        });
+      }
+    } else if (id === "rest") {
+      if (metrics.sleep.bedtime || metrics.sleep.durationHours != null) {
+        const bed = metrics.sleep.bedtime?.replace(/^约/, "") ?? "";
+        const fact = [
+          bed && `昨晚约 ${bed} 入睡`,
+          metrics.sleep.durationHours != null && `时长约 ${metrics.sleep.durationHours} 小时`,
+        ]
+          .filter(Boolean)
+          .join("，");
+        msgs.push({
+          id,
+          label,
+          text: `${fact}。明晚试着提前 30 分钟收屏；休息日也要给睡眠留座。`,
+        });
+      } else if (/游戏|刷手机|视频|追剧/.test(materialText)) {
+        msgs.push({
+          id,
+          label,
+          text: "屏幕时间偏长，注意力被轻轻扯散——不算失败。今晚比昨天早半小时收屏，比明天早起更有效。",
+        });
+      } else {
+        msgs.push({
+          id,
+          label,
+          text: "真正休息不是躺平，是给大脑留白。今晚记一句「几点收屏、几点躺下」，明天休息教练才能对准你的节奏。",
+        });
+      }
+    } else if (id === "career") {
       if (workTimes.length >= 2) {
         const ratio =
           focusMin + outputMin > 0
@@ -454,11 +727,14 @@ export function buildFallbackTeamMessages(
         });
       }
     } else if (id === "parenting") {
+      const anchor =
+        materialText.match(/.{0,12}(?:孩子|娃|育儿|带娃|亲子|宝宝|幼儿|儿子|女儿|小孩|哄睡|陪孩子).{0,32}/)?.[0] ??
+        parsed.lifeLines.find((l) => hasParentingSignals(l))?.slice(0, 40) ??
+        "今天的育儿片段";
       msgs.push({
         id,
         label,
-        text:
-          "带娃后的无力感值得被看见：今晚不必再苛责自己。明天若再遇情绪高峰，提前 10 分钟降低刺激（少一项屏幕、多一口水），就够。",
+        text: `「${anchor.replace(/^[-*•✅□\s]+/, "").trim().slice(0, 32)}」值得被看见。今晚不必再苛责自己；明天情绪高峰时，提前 10 分钟降刺激（少一项屏幕、多一口水），就够。`,
       });
     }
   }

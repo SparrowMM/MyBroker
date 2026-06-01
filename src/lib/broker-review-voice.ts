@@ -1,5 +1,7 @@
 /** 日终复盘的文风与结构约定（LLM prompt + 本地回退共用） */
 
+import type { DayMode } from "@/lib/day-mode";
+
 export const BROKER_REVIEW_SYSTEM = `你是用户唯一的私人经纪人（首席），也是一位会把工作日写成「可收进笔记本的散文」的编辑。
 你背后有一个很小的「经纪人团」，但你仍是唯一对外声音：团只在你安排的「团留言」里各说 1～2 句，最后由你收束。
 
@@ -17,7 +19,32 @@ export const BROKER_REVIEW_SYSTEM = `你是用户唯一的私人经纪人（首�
 - 工作建议要可执行，但用「人话」表达，而非 OKR 条目堆砌；
 - 用户需要「全面的分析」：在散文里也要说清楚时间结构、项目分布、记录缺口与明日重点，但不要写成冷冰冰的数据报表。`;
 
-export function reviewSectionOutline(ymd: string): string {
+export const BROKER_REST_REVIEW_SYSTEM = `你是用户唯一的私人经纪人（首席），也是一位会把休息日写成「可收进笔记本的散文」的编辑。
+今天对用户是**休息日**：材料里不应出现工作复盘，你也**不得**引用系统待办、项目名、会议名或「明天工作清单」。
+
+团员（休息日仅以下三位可出镜，**禁止职业教练**；育儿同伴仅当有娃时可额外出现）：
+- **生活教练**：关注家人、陪伴、家务、社交与生活节奏；引用材料中的生活片段，给一条明日生活向小意图；
+- **健身教练**：关注运动、训练、跑步与恢复；有运动记录须引用时长或项目，建议明日保持或略减强度，勿加量施压；
+- **休息教练**：关注睡眠、收屏、放空与恢复；有睡眠/屏幕线索须据此给收屏或睡眠窗建议；
+- **育儿同伴**（有育儿记录时**必须出镜**）：引用材料中的带娃/陪伴片段，同伴口吻，不讲育儿理论课。
+
+你的读者厌恶在休息日被工作提醒打断。不要写：AE农场、社媒项目、趋势洞察、周会、待办、对焦、交付、闭环、颗粒度。
+
+你的文风：
+- 像深夜给懂你的人写信：有画面、有节奏，写清这一天如何被生活填满；
+- 事实必须准确，只引用材料里的生活片段（家人、运动、打扫、放松等），不编造；
+- 可用轻隐喻（光、雾、余温），但不要浮夸；
+- 给明天的建议应是**生活向**的（睡眠、陪伴、运动、收屏），而非工作事项。`;
+
+export function reviewSectionOutline(ymd: string, mode: DayMode = "work"): string {
+  if (mode === "rest") {
+    return `## ${ymd} · 收工时刻
+### 今日切片
+### 生活手记
+### 生活隙
+### 团留言
+### 经纪人说`;
+  }
   return `## ${ymd} · 收工片刻
 ### 今日切片
 ### 工作台手记
@@ -32,7 +59,12 @@ export function buildBrokerReviewUserPrompt(
   recordBlocks: string,
   todoLines: string,
   teamTriggerHints = "",
+  mode: DayMode = "work",
 ): string {
+  if (mode === "rest") {
+    return buildBrokerRestReviewUserPrompt(ymd, recordBlocks, teamTriggerHints);
+  }
+
   const teamBlock = teamTriggerHints.trim()
     ? `\n${teamTriggerHints.trim()}\n`
     : "";
@@ -63,7 +95,43 @@ ${teamBlock}
 ${todoLines || "（无）"}
 
 输出结构（二级/三级标题按顺序，不要省略、不要改名）:
-${reviewSectionOutline(ymd)}`;
+${reviewSectionOutline(ymd, "work")}`;
+}
+
+export function buildBrokerRestReviewUserPrompt(
+  ymd: string,
+  recordBlocks: string,
+  teamTriggerHints = "",
+): string {
+  const teamBlock = teamTriggerHints.trim()
+    ? `\n${teamTriggerHints.trim()}\n`
+    : "";
+
+  return `请为 ${ymd} 写一份**休息日**收工复盘（Markdown，不要 JSON）。
+
+【休息日底线 — 必须遵守】
+1) 这是休息日：全文不得出现工作项目、会议、系统待办、职业教练，不得建议「明天先处理 XX 工作」；
+2) 只根据下方「今日生活记录」写，禁止引用未出现的项目名（AE农场、社媒、趋势洞察、周会等一律不许写）；
+3) 不要写「工作日志空白」「待确认事项待补」等工作语境；若生活记录已够，不必提醒补工作日报；
+4) 不要输出「仍悬而未决」章节（工作待办与用户今日无关）。
+
+【表达形态】
+- 标题与章节名必须严格使用下方「输出结构」；
+- 「今日切片」：按时段或主题写 1～2 段散文，呈现这一天如何被生活填满；
+- 「生活手记」：用三个加粗小标题组织（不要用「工作台」「亮点/卡点/明天建议」字样）：
+  - **闪过的光**（今日值得记住的生活瞬间，≥2 点）
+  - **未散的雾**（疲惫、分心、情绪或未竟的生活小事，≥1 点；勿写工作相关）
+  - **留给明天**（明天的生活向小意图，如睡眠、运动、陪伴，≥1 点；禁止工作事项）
+- 「生活隙」：有余温的短文字，点出感官或情绪细节；
+- 「团留言」：0～4 条，每条格式 \`- **角色名**：1～2 句\`；角色从生活教练、健身教练、休息教练中选（有信号者出镜）；**若下方顾问触发标明育儿同伴必须出镜，则团留言中必须包含育儿同伴一条**；参照下方摘录，「不出镜」的顾问不要写；若都不出镜，写「今日顾问未出镜，首席已收束。」；
+- 「经纪人说」：2～3 句，鼓励收工、肯定休息的价值，不提工作。
+
+今日生活记录:
+${recordBlocks || "（今日无记录）"}
+${teamBlock}
+
+输出结构（二级/三级标题按顺序，不要省略、不要改名）:
+${reviewSectionOutline(ymd, "rest")}`;
 }
 
 /** 从复盘 Markdown 主标题提取日历日；无法识别时返回 null */
@@ -81,9 +149,11 @@ export function reviewMarkdownMatchesDate(md: string, ymd: string): boolean {
 
 /** 本地回退时的章节标题（与 LLM 一致） */
 export const REVIEW_HEADINGS = {
-  title: (ymd: string) => `## ${ymd} · 收工片刻`,
+  title: (ymd: string, mode: DayMode = "work") =>
+    mode === "rest" ? `## ${ymd} · 收工时刻` : `## ${ymd} · 收工片刻`,
   slice: "### 今日切片",
   workbench: "### 工作台手记",
+  lifeNotes: "### 生活手记",
   life: "### 生活隙",
   pending: "### 仍悬而未决",
   team: "### 团留言",

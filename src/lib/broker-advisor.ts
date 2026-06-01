@@ -9,11 +9,13 @@ import {
   type ParsedDailyRecord,
 } from "@/lib/daily-record-structure";
 import {
+  BROKER_REST_REVIEW_SYSTEM,
   BROKER_REVIEW_SYSTEM,
   buildBrokerReviewUserPrompt,
   reviewMarkdownMatchesDate,
 } from "@/lib/broker-review-voice";
 import { buildFallbackReviewMarkdown } from "@/lib/broker-review-fallback";
+import { classifyDayMode, type DayMode } from "@/lib/day-mode";
 import { formatTeamTriggerHints, joinRecordMaterial } from "@/lib/broker-team";
 import { prisma } from "@/lib/prisma";
 import { decodeJsonList } from "@/lib/record-analyzer";
@@ -180,10 +182,14 @@ function mergeParsedRecords(parsedList: ParsedDailyRecord[]): ParsedDailyRecord 
   return merged;
 }
 
-function fallbackReviewMarkdown(ymd: string, ctx: Awaited<ReturnType<typeof loadDayContext>>): string {
+function fallbackReviewMarkdown(
+  ymd: string,
+  ctx: Awaited<ReturnType<typeof loadDayContext>>,
+  mode: DayMode,
+): string {
   const parsed = mergeParsedRecords(ctx.parsedRecords);
-  const material = joinRecordMaterial(ctx.recordBlocks, ctx.todoLines.join("\n"));
-  return buildFallbackReviewMarkdown(ymd, parsed, material, ctx);
+  const material = joinRecordMaterial(ctx.recordBlocks, mode === "work" ? ctx.todoLines.join("\n") : "");
+  return buildFallbackReviewMarkdown(ymd, parsed, material, ctx, mode);
 }
 
 export async function generateBrokerPriorities(
@@ -354,32 +360,41 @@ export async function generateBrokerDailyReview(
 
   const ctx = await loadDayContext(ymd);
   const recordBlocksJoined = ctx.recordBlocks.join("\n\n────\n\n") || "（今日无记录）";
-  const material = joinRecordMaterial(ctx.recordBlocks, ctx.todoLines.join("\n"));
+  const recordMaterial = joinRecordMaterial(ctx.recordBlocks);
+  const dayMode = classifyDayMode(ymd, ctx.parsedRecords, recordMaterial);
+  const materialForTeam = dayMode === "rest" ? recordMaterial : joinRecordMaterial(ctx.recordBlocks, ctx.todoLines.join("\n"));
   const prompt = buildBrokerReviewUserPrompt(
     ymd,
     recordBlocksJoined,
     ctx.todoLines.join("\n") || "（无）",
-    formatTeamTriggerHints(material),
+    formatTeamTriggerHints(materialForTeam, { restDay: dayMode === "rest" }),
+    dayMode,
   );
 
+  const chatScenario = dayMode === "rest" ? "broker_rest_review" : "broker_daily_review";
   const chatOpts = {
-    temperature: 0.52,
-    scenario: "broker_daily_review" as const,
-    maxTokens: 3200,
+    temperature: dayMode === "rest" ? 0.48 : 0.52,
+    scenario: chatScenario,
+    maxTokens: dayMode === "rest" ? 2400 : 3200,
     timeoutSec: 120,
   };
+  const systemPrompt = dayMode === "rest" ? BROKER_REST_REVIEW_SYSTEM : BROKER_REVIEW_SYSTEM;
   let raw = await chat(
-    [{ role: "system", content: BROKER_REVIEW_SYSTEM }, { role: "user", content: prompt }],
+    [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }],
     chatOpts,
   );
   if (!raw?.trim()) {
     raw = await chat(
-      [{ role: "system", content: BROKER_REVIEW_SYSTEM }, { role: "user", content: prompt }],
-      { ...chatOpts, temperature: 0.45, scenario: "broker_daily_review_retry" },
+      [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }],
+      {
+        ...chatOpts,
+        temperature: 0.45,
+        scenario: dayMode === "rest" ? "broker_rest_review_retry" : "broker_daily_review_retry",
+      },
     );
   }
 
-  const markdown = raw?.trim() ? raw.trim() : fallbackReviewMarkdown(ymd, ctx);
+  const markdown = raw?.trim() ? raw.trim() : fallbackReviewMarkdown(ymd, ctx, dayMode);
   const data: BrokerDailyReview = {
     review_date: ymd,
     generated_at: new Date().toISOString(),

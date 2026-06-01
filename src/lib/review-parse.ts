@@ -31,19 +31,20 @@ export type ParsedReview = {
 
 const SECTION_KIND: { match: RegExp; kind: ParsedReviewSection["kind"]; title: string }[] = [
   { match: /今日切片|今天做了什么/, kind: "slice", title: "今日切片" },
-  { match: /工作台手记|^工作$/, kind: "workbench", title: "工作台手记" },
+  { match: /工作台手记|^工作$|生活手记/, kind: "workbench", title: "工作台手记" },
   { match: /生活隙|^生活$/, kind: "life", title: "生活隙" },
   { match: /仍悬而未决|未完成待办/, kind: "pending", title: "仍悬而未决" },
   { match: /团留言|顾问留言/, kind: "team", title: "团留言" },
   { match: /经纪人说|经纪人寄语/, kind: "closing", title: "经纪人说" },
 ];
 
-const TEAM_ROLE_RE = /^\*\*(职业教练|复原顾问|育儿同伴)\*\*[：:]\s*(.+)$/;
+const TEAM_ROLE_RE =
+  /^\*\*(职业教练|复原顾问|育儿同伴|生活教练|健身教练|休息教练)\*\*[：:]\s*(.+)$/;
 
 const WORKBENCH_LABELS: { re: RegExp; lane: keyof WorkbenchLanes; label: string }[] = [
   { re: /闪过的光|亮点/, lane: "light", label: "闪过的光" },
   { re: /未散的雾|卡点/, lane: "fog", label: "未散的雾" },
-  { re: /明日的一盏灯|明天建议/, lane: "lamp", label: "明日的一盏灯" },
+  { re: /明日的一盏灯|明天建议|留给明天/, lane: "lamp", label: "明日的一盏灯" },
 ];
 
 function classifySection(heading: string): ParsedReviewSection["kind"] {
@@ -54,6 +55,7 @@ function classifySection(heading: string): ParsedReviewSection["kind"] {
 }
 
 function displayTitle(heading: string, kind: ParsedReviewSection["kind"]): string {
+  if (kind === "workbench" && /生活手记/.test(heading)) return "生活手记";
   const row = SECTION_KIND.find((r) => r.kind === kind);
   return row?.title ?? heading;
 }

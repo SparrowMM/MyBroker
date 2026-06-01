@@ -2,6 +2,7 @@
 
 import type { ParsedDailyRecord, DailyRecordProject } from "@/lib/daily-record-structure";
 import { isLifeContent, isWorkProjectName } from "@/lib/daily-record-structure";
+import type { DayMode } from "@/lib/day-mode";
 import {
   analyzeDayMetrics,
   buildFallbackTeamMessages,
@@ -128,12 +129,138 @@ function buildMists(parsed: ParsedDailyRecord): string[] {
   return mists;
 }
 
-export function buildFallbackReviewMarkdown(
+function buildLifeSliceParagraphs(parsed: ParsedDailyRecord, material: string): string[] {
+  const paras: string[] = [];
+  const slotOrder = ["上午", "中午", "下午", "晚上"];
+  for (const slot of slotOrder) {
+    const chunk = material.match(new RegExp(`${slot}[^\\n]{6,180}`, "m"));
+    if (chunk && isLifeContent(chunk[0])) {
+      paras.push(chunk[0].replace(/\s+/g, " ").trim().slice(0, 220));
+    }
+  }
+  const lifeSnippets = collectLifeSnippets(material, parsed);
+  if (lifeSnippets.length) {
+    paras.push(lifeSnippets.slice(0, 4).join("；") + "。");
+  }
+  if (!paras.length && parsed.sections.progress.length) {
+    const lines = parsed.sections.progress.filter((l) => isLifeContent(l) || l.length > 4).slice(0, 6);
+    if (lines.length) paras.push(lines.join("；") + "。");
+  }
+  return paras;
+}
+
+function buildRestLifeLights(parsed: ParsedDailyRecord, material: string): string[] {
+  const lights: string[] = [];
+  for (const x of parsed.lifeLines.slice(0, 4)) {
+    lights.push(`**${x.replace(/^[-*•✅□\s]+/, "").slice(0, 40)}** 留在今天的账本里。`);
+  }
+  for (const line of material.split(/\n/)) {
+    if (!isLifeContent(line)) continue;
+    const t = line.replace(/^[-*•✅□\s]+/, "").trim();
+    if (t.length > 6 && !lights.some((l) => l.includes(t.slice(0, 12)))) {
+      lights.push(t.slice(0, 72));
+    }
+    if (lights.length >= 4) break;
+  }
+  return [...new Set(lights)].slice(0, 4);
+}
+
+function buildRestLifeMists(material: string): string[] {
+  const mists: string[] = [];
+  if (/游戏|刷手机|视频|屏幕|分心/.test(material)) {
+    mists.push("屏幕时间偏长，注意力像被轻轻扯散——不算失败，只是身体在讨一点空白。");
+  }
+  if (/累|疲惫|困|熬夜|失眠/.test(material)) {
+    mists.push("身体还在喊累；今晚值得比平日更早收束。");
+  }
+  return mists;
+}
+
+function buildRestLifeLamps(material: string): string[] {
+  const lamps: string[] = [];
+  if (/跑步|运动|健身|训练/.test(material)) {
+    lamps.push("若身体状态不错，明天可以留同样的运动窗，短一点也没关系。");
+  }
+  if (/家庭|家人|陪伴|孩子/.test(material)) {
+    lamps.push("把一段无目的的陪伴时间写进明天，比任何清单都实在。");
+  }
+  lamps.push("明晚试着提前 30 分钟收屏，让睡眠先占位。");
+  return lamps.slice(0, 3);
+}
+
+function buildRestFallbackReviewMarkdown(
   ymd: string,
   parsed: ParsedDailyRecord,
   material: string,
   ctx: FallbackReviewContext,
 ): string {
+  const lines: string[] = [];
+  lines.push(REVIEW_HEADINGS.title(ymd, "rest"));
+  lines.push("");
+  lines.push("> 笔调来自本地整理（模型未响应），事实仍取自你的生活记录。");
+  lines.push("");
+  lines.push(REVIEW_HEADINGS.slice);
+
+  if (!ctx.records.length) {
+    lines.push("休息日还空着。随手写两三句今天如何度过，夜里复盘才有温度。");
+  } else {
+    const paras = buildLifeSliceParagraphs(parsed, material);
+    lines.push(
+      paras.length
+        ? paras.join("\n\n")
+        : "今天的主线在生活里；补几笔具体片段后重新生成会更细。",
+    );
+  }
+
+  lines.push("");
+  lines.push(REVIEW_HEADINGS.lifeNotes);
+  const lights = buildRestLifeLights(parsed, material);
+  lines.push("- **闪过的光**");
+  for (const x of (lights.length ? lights : ["值得被记住的瞬间，等你补一两笔"]).slice(0, 4)) {
+    lines.push(`  - ${x}`);
+  }
+  const mists = buildRestLifeMists(material);
+  lines.push("- **未散的雾**");
+  for (const x of (mists.length ? mists : ["若心里有未说出口的累，也值得写一句"]).slice(0, 3)) {
+    lines.push(`  - ${x}`);
+  }
+  const lamps = buildRestLifeLamps(material);
+  lines.push("- **留给明天**");
+  for (const x of lamps) lines.push(`  - ${x}`);
+
+  lines.push("");
+  lines.push(REVIEW_HEADINGS.life);
+  const lifeSnippets = collectLifeSnippets(material, parsed);
+  if (lifeSnippets.length) {
+    lines.push(lifeSnippets.join("；") + "。");
+    lines.push("这些时刻不是工作的附录，它们就是你今天的正文。");
+  } else {
+    lines.push("休息日里，哪怕只是慢下来，也已经完成了很重要的事。");
+  }
+
+  const teamMsgs = buildFallbackTeamMessages(material, parsed, { restDay: true });
+  const teamMd = formatTeamSectionMarkdown(teamMsgs);
+  lines.push("");
+  lines.push(teamMd || `${REVIEW_HEADINGS.team}\n今日顾问未出镜，首席已收束。`);
+
+  lines.push("");
+  lines.push(REVIEW_HEADINGS.closing);
+  lines.push("今天属于生活。睡前不必为工作留座——把空白留给睡眠和明天清晨的第一口气。");
+
+  return lines.join("\n");
+}
+
+export function buildFallbackReviewMarkdown(
+  ymd: string,
+  parsed: ParsedDailyRecord,
+  material: string,
+  ctx: FallbackReviewContext,
+  mode: DayMode = "work",
+): string {
+  if (mode === "rest") {
+    return buildRestFallbackReviewMarkdown(ymd, parsed, material, ctx);
+  }
+
   const lines: string[] = [];
   const projects = workProjects(parsed);
   const metrics = analyzeDayMetrics(material);

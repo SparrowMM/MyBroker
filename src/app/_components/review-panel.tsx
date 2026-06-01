@@ -73,10 +73,12 @@ function TeamCards({ section }: { section: ParsedReviewSection }) {
 
 function WorkbenchCards({ section }: { section: ParsedReviewSection }) {
   const wb = section.workbench ?? { light: [], fog: [], lamp: [] };
+  const isLifeNotes = section.title === "生活手记";
+  const lampLabel = isLifeNotes ? "留给明天" : "明日的一盏灯";
   const lanes = [
     { key: "light" as const, label: "闪过的光", items: wb.light, tone: "light" },
     { key: "fog" as const, label: "未散的雾", items: wb.fog, tone: "fog" },
-    { key: "lamp" as const, label: "明日的一盏灯", items: wb.lamp, tone: "lamp" },
+    { key: "lamp" as const, label: lampLabel, items: wb.lamp, tone: "lamp" },
   ];
 
   return (
